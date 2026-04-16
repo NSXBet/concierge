@@ -66,9 +66,10 @@ If `$ARGUMENTS` is empty or vague, ask one concise question:
    - Use `MAIN_OBSIDIAN_ROOT`, then `OBSIDIAN_VAULT`, then `~/notes/work`.
 
 2. Audit the environment.
-   - Check `gt`, `bd`, `git`, `obsidian`, `graphify`, and `rtk`.
+   - Check `gt`, `bd`, `git`, `graphify`, and `rtk`.
    - Check whether the GT root exists and is initialized.
    - Check which rigs exist with `gt rig list` or by inspecting the town root.
+   - Check whether the Obsidian MCP server is available.
 
 3. Initialize or repair GT if needed.
    - Use `scripts/ensure_gt.py --apply`.
@@ -84,21 +85,44 @@ If `$ARGUMENTS` is empty or vague, ask one concise question:
    - For existing rigs or user-named projects, create project note folders and stub notes if missing.
    - Do not overwrite user-authored notes.
 
-5. Ensure RTK is active.
+5. Ensure the Obsidian MCP server is connected.
+   - Check whether `mcp-obsidian` (or `mcp__mcp-obsidian__obsidian_list_files_in_vault`) is available as an MCP tool.
+   - If it is not available, walk the user through setting it up:
+     a. Obsidian must be installed and running.
+     b. The **Local REST API** community plugin must be enabled in Obsidian (Settings > Community plugins > Browse > "Local REST API"). See https://github.com/coddingtonbear/obsidian-local-rest-api.
+     c. The user needs the API key from the Local REST API plugin settings.
+     d. Add the MCP server to `~/.claude/.mcp.json` (or the project `.mcp.json`):
+        ```json
+        {
+          "mcpServers": {
+            "mcp-obsidian": {
+              "command": "uvx",
+              "args": ["mcp-obsidian"],
+              "env": {
+                "OBSIDIAN_API_KEY": "<api-key>"
+              }
+            }
+          }
+        }
+        ```
+     e. After editing the config, tell the user to restart Claude Code or run `/reload-plugins`.
+   - If the MCP server is already available, confirm it is working by listing files in the vault.
+
+6. Ensure RTK is active.
    - Use `scripts/setup_rtk.sh --apply`.
    - If `rtk` is missing, prefer Homebrew when available; otherwise use the official installer.
    - Run `rtk init --global` so Claude's shell commands can be rewritten through RTK.
    - If RTK is already present, verify the hook is installed and repair it if needed.
 
-6. Install or refresh Graphify.
+7. Install or refresh Graphify.
    - If `graphify` is missing, install the package first, then run `graphify install`.
    - For each target rig, use `scripts/refresh_graphify.py --apply`.
    - Default to the canonical clone under `<rig>/mayor/rig`.
    - If the user is currently working in a crew clone and asks for immediate deep work there, you may also refresh that active clone.
 
-7. Report remaining manual steps.
+8. Report remaining manual steps.
    - If you asked for repo URLs and are waiting on them, say that clearly.
-   - If Obsidian CLI is not enabled, say so clearly.
+   - If the Obsidian MCP server could not be verified, say so clearly.
    - If a rig has no repo clone yet, explain what is missing.
    - If RTK or Graphify installation fails, show the command and error.
 
@@ -120,6 +144,9 @@ What paths, rigs, and tools you audited.
 
 ### GT and RTK
 What you initialized, added, or enabled for Gastown and RTK.
+
+### Obsidian and MCP
+Whether the vault exists, the MCP server is connected, and any setup steps taken or remaining.
 
 ### Created or repaired
 What vault folders, notes, or repo integrations you created.

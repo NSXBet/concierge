@@ -11,6 +11,7 @@ SHARED_DIRS = [
     Path("Shared/Security"),
     Path("Shared/Reliability"),
     Path("Projects"),
+    Path("Plans"),
 ]
 
 SHARED_FILES = {

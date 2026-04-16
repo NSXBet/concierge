@@ -166,5 +166,6 @@ Ensure these folders exist:
 - `Shared/Security`
 - `Shared/Reliability`
 - `Projects`
+- `Plans`
 - `Analysis`
 - `PR-Reviews`
