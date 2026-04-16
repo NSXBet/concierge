@@ -46,6 +46,8 @@ Concierge provides three skills:
 
 ### `/concierge:go` -- Conversational intake and dispatch
 
+> **Run `/concierge:setup` first** to make sure your environment is properly configured. Setup detects and fixes missing tools, broken connections, and vault issues before they cause problems during work.
+
 The main entry point. Describe what you want in plain language and concierge figures out the rest.
 
 ```
@@ -68,6 +70,8 @@ What it handles:
 | **PR review** | Fetches the diff via `gh`, grades the PR (A-F), writes a structured review note to Obsidian, and optionally posts it to GitHub |
 
 ### `/concierge:plan` -- Interactive planning
+
+> **Run `/concierge:setup` first** to make sure your environment is properly configured. Planning relies on Graphify and Obsidian -- setup ensures both are connected and working.
 
 Interviews you about a piece of work, explores the codebase, and produces a structured plan in Obsidian before any code is written.
 
