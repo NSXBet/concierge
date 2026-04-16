@@ -1,5 +1,5 @@
 ---
-name: concierge-setup
+name: setup
 description: initialize or repair the local foundation for gastown, obsidian, graphify, and rtk. use when the gt root may not exist yet, you want to add rigs from repo urls, create or repair the obsidian vault layout, install rtk and its claude hook, install graphify when missing, or refresh graphify on existing rigs.
 allowed-tools:
   - Bash(gt *)
@@ -132,8 +132,8 @@ Only the actions the user still needs to take.
 
 ## Examples
 
-- `/concierge-setup`
-- `/concierge-setup audit everything`
-- `/concierge-setup initialize the workspace and ask me for rig urls`
-- `/concierge-setup set up shop and growth`
-- `/concierge-setup refresh graphify on all rigs`
+- `/concierge:setup`
+- `/concierge:setup audit everything`
+- `/concierge:setup initialize the workspace and ask me for rig urls`
+- `/concierge:setup set up shop and growth`
+- `/concierge:setup refresh graphify on all rigs`

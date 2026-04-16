@@ -1,5 +1,5 @@
 ---
-name: concierge
+name: go
 description: conversational intake and dispatch for gastown workspaces that use obsidian for notes, graphify for repo understanding, and rtk for shell-noise reduction. use when you want to describe work in plain language, continue previous work, start a new project, ask for status, or review a pull request, and want the agent to set up or repair gt, obsidian, graphify, and rtk as needed before dispatching work.
 allowed-tools:
   - Bash(gt *)
@@ -272,11 +272,11 @@ Only include the missing pieces that prevent further action.
 
 ## Examples
 
-- `/concierge`
-- `/concierge start the checkout coupon feature for shop`
-- `/concierge continue previous work on onboarding`
-- `/concierge start a new project from https://github.com/acme/analytics-api`
-- `/concierge what is blocked in shop right now?`
-- `/concierge review PR 142 on flags`
-- `/concierge review https://github.com/NSXBet/flags/pull/142`
-- `/concierge review PR 142 on flags and post it`
+- `/concierge:go`
+- `/concierge:go start the checkout coupon feature for shop`
+- `/concierge:go continue previous work on onboarding`
+- `/concierge:go start a new project from https://github.com/acme/analytics-api`
+- `/concierge:go what is blocked in shop right now?`
+- `/concierge:go review PR 142 on flags`
+- `/concierge:go review https://github.com/NSXBet/flags/pull/142`
+- `/concierge:go review PR 142 on flags and post it`

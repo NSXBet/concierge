@@ -20,4 +20,4 @@ When this happens:
 6. Install or refresh Graphify for the target rigs.
 7. Return to the user's original goal and continue with intake and dispatch.
 
-If the user invoked `/setup-tooling` separately, let that skill own the broad setup pass. Otherwise do only the minimum setup needed to keep momentum.
+If the user invoked `/concierge:setup` separately, let that skill own the broad setup pass. Otherwise do only the minimum setup needed to keep momentum.
