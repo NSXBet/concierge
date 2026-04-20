@@ -1,6 +1,6 @@
 # Concierge
 
-A Claude Code plugin that lets you describe work in plain language and have the agent handle [Gastown](https://github.com/NSXBet/gastown), [Obsidian](https://obsidian.md), [Graphify](https://github.com/NSXBet/graphify), and [RTK](https://github.com/rtk-ai/rtk) behind the scenes.
+A Claude Code plugin that lets you describe work in plain language and have the agent handle [Gastown](https://github.com/gastownhall/gastown), [Obsidian](https://obsidian.md), [Graphify](https://github.com/safishamsi/graphify), and [RTK](https://github.com/rtk-ai/rtk) behind the scenes.
 
 Start features, continue previous work, review pull requests, check status, or bootstrap entire projects -- all without thinking about bead IDs, convoy commands, or tool-specific syntax.
 
@@ -9,9 +9,9 @@ Start features, continue previous work, review pull requests, check status, or b
 ### Prerequisites
 
 - [Claude Code](https://code.claude.com/docs/en/quickstart) installed and authenticated
-- [Gastown (`gt`)](https://github.com/NSXBet/gastown) installed
+- [Gastown (`gt`)](https://github.com/gastownhall/gastown) installed
 - [Obsidian](https://obsidian.md) installed with the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) community plugin enabled (see [Setting up Obsidian](#setting-up-obsidian))
-- [Graphify](https://github.com/NSXBet/graphify) installed
+- [Graphify](https://github.com/safishamsi/graphify) installed
 - [RTK](https://github.com/rtk-ai/rtk) installed
 - [Git](https://git-scm.com/) and [GitHub CLI (`gh`)](https://cli.github.com/) installed
 

@@ -278,5 +278,5 @@ Only include the missing pieces that prevent further action.
 - `/concierge:go start a new project from https://github.com/acme/analytics-api`
 - `/concierge:go what is blocked in shop right now?`
 - `/concierge:go review PR 142 on flags`
-- `/concierge:go review https://github.com/NSXBet/flags/pull/142`
+- `/concierge:go review https://github.com/acme/flags/pull/142`
 - `/concierge:go review PR 142 on flags and post it`
