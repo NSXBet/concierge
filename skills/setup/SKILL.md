@@ -61,11 +61,19 @@ Concierge config resolution order:
 
 Use the helper scripts in `scripts/` for deterministic filesystem work.
 
-## If Arguments Are Missing
+## Arguments
 
-If `$ARGUMENTS` is empty or vague, ask one concise question:
+The default action is a full audit — do NOT ask the user what to do when `$ARGUMENTS` is empty. Run the audit first, report the findings, and only ask targeted follow-up questions about gaps the audit surfaced.
 
-- “Do you want me to audit everything, initialize the workspace, add rigs, or just refresh Graphify?”
+Recognized arguments (case-insensitive substring match is fine):
+
+- no args / `audit` / `status` — full audit, report only, no installs or upgrades
+- `upgrade` / `latest` / `--latest` — audit, then run known upgrade commands for any tool flagged outdated
+- `init` / `initialize` — audit, then fix gaps: install missing tools, initialize GT, clone vault repos, etc.
+- `add rig <url>` / `add rigs` — audit + targeted rig add only
+- `refresh graphify` — targeted Graphify refresh only
+
+When in doubt (ambiguous free-form input), run the audit first and then ask one targeted question about the user's intent based on what you found.
 
 ## Concierge Setup Workflow
 
@@ -73,11 +81,11 @@ If `$ARGUMENTS` is empty or vague, ask one concise question:
    - Use `MAIN_GT_ROOT`, then `GT_TOWN_ROOT`, then `~/gt`.
    - Use `MAIN_OBSIDIAN_ROOT`, then `OBSIDIAN_VAULT`, then `~/notes/work`.
 
-2. Audit the environment.
-   - Check `gt`, `bd`, `git`, `graphify`, and `rtk`.
-   - Check whether the GT root exists and is initialized.
-   - Check which rigs exist with `gt rig list` or by inspecting the town root.
-   - Check whether the Obsidian MCP server is available.
+2. Audit the environment (always run this first).
+   - Invoke `scripts/audit_env.py` (add `--upgrade` if the user asked for upgrades; add `--json` if you need machine-readable output for follow-on logic).
+   - The script checks: `gt`, `graphify`, `rtk`, `gh`, `git`, `python3` — presence, installed version, latest upstream release (via `gh release view`), and status (`ok` / `outdated` / `missing` / `unknown`). It also reports GT root state, rig count, concierge config source, MCP-obsidian registration, and the RTK hook.
+   - Report the audit findings to the user before taking any install or repair action. "Outdated" is never auto-fixed — only presence gaps are auto-repaired in subsequent steps, and only when the user's intent is `init`/`initialize` (or the original free-form request implied repair).
+   - Version comparison is semver-only. Tools built from source (e.g. `gt version HEAD-<sha>`) are reported as `unknown` — surface the installed string and the latest release tag side-by-side and let the user decide.
 
 3. Initialize or repair GT if needed.
    - Use `scripts/ensure_gt.py --apply`.
@@ -158,8 +166,11 @@ If `$ARGUMENTS` is empty or vague, ask one concise question:
 
 Always report in this structure:
 
+### Audit summary
+The per-tool status from `scripts/audit_env.py` (installed version, latest version, status). Call out anything flagged `missing` or `outdated`.
+
 ### Checked
-What paths, rigs, and tools you audited.
+What paths, rigs, and configs you inspected.
 
 ### GT and RTK
 What you initialized, added, or enabled for Gastown and RTK.
@@ -183,3 +194,4 @@ Only the actions the user still needs to take.
 - `/concierge:setup initialize the workspace and ask me for rig urls`
 - `/concierge:setup set up shop and growth`
 - `/concierge:setup refresh graphify on all rigs`
+- `/concierge:setup upgrade` (audit, then upgrade any outdated tools)
