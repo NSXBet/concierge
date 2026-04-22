@@ -26,6 +26,22 @@ export ANTHROPIC_API_KEY=sk-...
 evals/.venv/bin/python evals/fresh_vault.py
 ```
 
+## Run all scenarios in parallel
+
+```bash
+evals/.venv/bin/python evals/run_all.py
+```
+
+The runner exits non-zero if any scenario fails or errors.
+
+## Scenarios
+
+- `fresh_vault.py` — empty machine; must enter first-run flow and ask for the concierge config.
+- `verify_existing.py` — already configured, matching remotes; must verify without mutation.
+- `wrong_remote.py` — config and vault origin disagree; must fail loud without mutating.
+- `outdated_tools.py` — tools behind upstream; must report but not auto-upgrade.
+- `upgrade_opt_in.py` — `/concierge:setup upgrade`; must run upgrade commands for outdated tools.
+
 Exit codes:
 
 - `0` — pass

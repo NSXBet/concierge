@@ -6,6 +6,7 @@ the filesystem under `sandbox.root` to make assertions.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -242,3 +243,65 @@ def report(name: str, failures: list[str]) -> int:
     for f in failures:
         print(f"  - {f}")
     return 1
+
+
+def seed_git_repo(path: Path, remote_url: str) -> None:
+    """Create a valid git repo at `path` with `origin` set to `remote_url`.
+
+    Uses the real `git` binary (not the shim) so origin is actually set.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+    real_git_env = os.environ.copy()
+    real_git_env.pop("CONCIERGE_EVAL_CALL_LOG", None)
+    subprocess.run(
+        ["git", "init", "--quiet", str(path)],
+        check=True,
+        env=real_git_env,
+    )
+    subprocess.run(
+        ["git", "-C", str(path), "remote", "add", "origin", remote_url],
+        check=True,
+        env=real_git_env,
+    )
+
+
+def seed_gt_root(gt_root: Path, rigs: list[str] | None = None) -> None:
+    """Create a fake initialized GT root with optional rig stubs."""
+    (gt_root / "mayor").mkdir(parents=True, exist_ok=True)
+    (gt_root / ".beads").mkdir(exist_ok=True)
+    for rig in rigs or []:
+        (gt_root / rig / "mayor" / "rig").mkdir(parents=True, exist_ok=True)
+        (gt_root / rig / "config.json").write_text("{}\n", encoding="utf-8")
+
+
+def write_concierge_config(sandbox: Sandbox, config: dict[str, Any]) -> Path:
+    """Write `~/.concierge.json` inside the sandbox and return its path."""
+    path = sandbox.home / ".concierge.json"
+    path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def audit_happened(calls: list[str]) -> tuple[bool, bool]:
+    """Return (audit_happened, script_was_used)."""
+    script_used = any("audit_env.py" in c for c in calls)
+    audit_signals = sum(
+        1
+        for c in calls
+        if c.startswith(("gh release view", "gt --version", "rtk --version", "pipx list"))
+    )
+    return (script_used or audit_signals >= 3), script_used
+
+
+def get_origin(path: Path) -> str | None:
+    """Read the origin remote URL from a git repo without triggering shims."""
+    real_git_env = os.environ.copy()
+    real_git_env.pop("CONCIERGE_EVAL_CALL_LOG", None)
+    proc = subprocess.run(
+        ["git", "-C", str(path), "remote", "get-url", "origin"],
+        capture_output=True,
+        text=True,
+        env=real_git_env,
+    )
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip()

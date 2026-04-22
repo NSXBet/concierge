@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# brew shim — logs every call; simulates install/upgrade without side effects.
+LOG="${CONCIERGE_EVAL_CALL_LOG:-/dev/null}"
+echo "brew $*" >> "$LOG"
+
+case "$1" in
+  install)  echo "brew: installed $2" ;;
+  upgrade)  echo "brew: upgraded $2" ;;
+  outdated) ;;
+  *)
+    echo "brew-shim: unhandled: $*" >&2
+    exit 0
+    ;;
+esac
