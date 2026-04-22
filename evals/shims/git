@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# git shim — logs every call; intercepts `clone` to avoid network I/O and
+# delegates everything else to the real git on PATH (skipping our shim dir).
+LOG="${CONCIERGE_EVAL_CALL_LOG:-/dev/null}"
+echo "git $*" >> "$LOG"
+
+REAL_GIT="$(PATH="/usr/bin:/usr/local/bin:/opt/homebrew/bin" command -v git)"
+if [ -z "$REAL_GIT" ]; then
+  echo "git-shim: could not locate real git" >&2
+  exit 1
+fi
+
+if [ "$1" = "clone" ]; then
+  shift
+  url=""
+  dest=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --*|-*) shift ;;
+      *)
+        if [ -z "$url" ]; then
+          url="$1"
+        elif [ -z "$dest" ]; then
+          dest="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+  if [ -z "$dest" ]; then
+    echo "git-shim: clone needs an explicit destination in eval sandbox" >&2
+    exit 1
+  fi
+  mkdir -p "$dest"
+  ( cd "$dest" && "$REAL_GIT" init --quiet && "$REAL_GIT" remote add origin "$url" ) >/dev/null
+  echo "Cloning $url to $dest (eval shim)"
+  exit 0
+fi
+
+exec "$REAL_GIT" "$@"

@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# gt shim — logs all calls and simulates Gastown operations against the sandbox.
+LOG="${CONCIERGE_EVAL_CALL_LOG:-/dev/null}"
+echo "gt $*" >> "$LOG"
+
+case "$1" in
+  --version)
+    echo "${CONCIERGE_EVAL_GT_VERSION:-gt version HEAD-test123}"
+    ;;
+  install)
+    # gt install <root>
+    target="${2:-${MAIN_GT_ROOT:-$HOME/gt}}"
+    mkdir -p "$target/mayor" "$target/.beads"
+    echo "gt: initialized $target"
+    ;;
+  rig)
+    case "$2" in
+      add)
+        name="$3"
+        url="$4"
+        root="${MAIN_GT_ROOT:-$HOME/gt}"
+        mkdir -p "$root/$name/mayor/rig"
+        printf '{}\n' > "$root/$name/config.json"
+        echo "gt: added rig $name from $url"
+        ;;
+      list)
+        :
+        ;;
+      *)
+        echo "gt-shim: unhandled rig subcommand: $2" >&2
+        ;;
+    esac
+    ;;
+  *)
+    echo "gt-shim: unhandled: $*" >&2
+    exit 0
+    ;;
+esac

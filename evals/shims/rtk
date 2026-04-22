@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# rtk shim — logs all calls, returns a canned version string.
+LOG="${CONCIERGE_EVAL_CALL_LOG:-/dev/null}"
+echo "rtk $*" >> "$LOG"
+
+case "$1" in
+  --version) echo "${CONCIERGE_EVAL_RTK_VERSION:-rtk 0.37.2}" ;;
+  init)      echo "rtk initialized" ;;
+  gain)      echo "Total savings: 0 tokens" ;;
+  proxy)
+    shift
+    exec "$@"
+    ;;
+  *)
+    echo "rtk-shim: unhandled: $*" >&2
+    exit 0
+    ;;
+esac

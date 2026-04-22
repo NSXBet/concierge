@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# pipx shim — logs all calls; audit_env.py calls `pipx list --short`.
+LOG="${CONCIERGE_EVAL_CALL_LOG:-/dev/null}"
+echo "pipx $*" >> "$LOG"
+
+case "$1" in
+  list)
+    if [ "$2" = "--short" ]; then
+      echo "${CONCIERGE_EVAL_PIPX_LIST:-graphifyy 0.4.29}"
+    fi
+    ;;
+  upgrade)  echo "upgraded: $2" ;;
+  install)  echo "installed: $2" ;;
+  *)
+    echo "pipx-shim: unhandled: $*" >&2
+    exit 0
+    ;;
+esac

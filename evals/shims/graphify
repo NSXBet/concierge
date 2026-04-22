@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# graphify shim — no --version support (matches real behavior), logs all calls.
+LOG="${CONCIERGE_EVAL_CALL_LOG:-/dev/null}"
+echo "graphify $*" >> "$LOG"
+
+case "$1" in
+  --version|version)
+    echo "error: unknown command '$1'" >&2
+    exit 1
+    ;;
+  install)
+    echo "graphify installed (shim)"
+    ;;
+  *)
+    echo "graphify-shim: unhandled: $*" >&2
+    exit 0
+    ;;
+esac
