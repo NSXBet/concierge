@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from harness import (
+    agent_commands,
     audit_happened,
     call_log,
     cleanup,
@@ -59,7 +60,8 @@ def run() -> int:
     text_raw = final_text(messages)
     text = text_raw.lower()
     calls = call_log(sandbox)
-    ran_audit, script_used = audit_happened(calls)
+    commands = agent_commands(sandbox)
+    ran_audit, script_used = audit_happened(calls, commands)
 
     upgrades = [
         c

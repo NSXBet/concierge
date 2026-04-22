@@ -57,6 +57,7 @@ class Sandbox:
     gt_root: Path
     vault_root: Path
     call_log_path: Path
+    agent_log_path: Path
     env: dict[str, str]
 
 
@@ -77,6 +78,8 @@ def make_sandbox(extra_env: dict[str, str] | None = None) -> Sandbox:
     vault_root.mkdir()
     call_log_path = root / "calls.log"
     call_log_path.touch()
+    agent_log_path = root / "agent_commands.log"
+    agent_log_path.touch()
 
     env = os.environ.copy()
     env["HOME"] = str(home)
@@ -97,6 +100,7 @@ def make_sandbox(extra_env: dict[str, str] | None = None) -> Sandbox:
         gt_root=gt_root,
         vault_root=vault_root,
         call_log_path=call_log_path,
+        agent_log_path=agent_log_path,
         env=env,
     )
 
@@ -193,6 +197,11 @@ def run_agent(
 
 def _run_bash(command: str, sandbox: Sandbox) -> str:
     try:
+        with sandbox.agent_log_path.open("a", encoding="utf-8") as f:
+            f.write(command.replace("\n", " \\n ") + "\n")
+    except OSError:
+        pass
+    try:
         proc = subprocess.run(
             command,
             shell=True,
@@ -227,6 +236,17 @@ def call_log(sandbox: Sandbox) -> list[str]:
     return [
         line.strip()
         for line in sandbox.call_log_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+def agent_commands(sandbox: Sandbox) -> list[str]:
+    """Commands the agent itself ran via the Bash tool (outermost layer)."""
+    if not sandbox.agent_log_path.exists():
+        return []
+    return [
+        line.strip()
+        for line in sandbox.agent_log_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
 
@@ -281,15 +301,29 @@ def write_concierge_config(sandbox: Sandbox, config: dict[str, Any]) -> Path:
     return path
 
 
-def audit_happened(calls: list[str]) -> tuple[bool, bool]:
-    """Return (audit_happened, script_was_used)."""
-    script_used = any("audit_env.py" in c for c in calls)
+def audit_happened(
+    calls: list[str], commands: list[str] | None = None
+) -> tuple[bool, bool]:
+    """Return (audit_happened, script_was_used).
+
+    `calls` is the shim call log — it includes tool invocations made both
+    by the agent directly AND by scripts the agent ran (because the script
+    also goes through the shims). That means the shim log alone cannot tell
+    you whether audit_env.py was the caller.
+
+    `commands` is the agent's own Bash-tool command list (from
+    `agent_commands(sandbox)`). Check that to tell direct use of the script
+    apart from inline re-implementation.
+    """
     audit_signals = sum(
         1
         for c in calls
         if c.startswith(("gh release view", "gt --version", "rtk --version", "pipx list"))
     )
-    return (script_used or audit_signals >= 3), script_used
+    script_used = False
+    if commands is not None:
+        script_used = any("audit_env.py" in c for c in commands)
+    return (audit_signals >= 3 or script_used), script_used
 
 
 def get_origin(path: Path) -> str | None:

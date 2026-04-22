@@ -77,9 +77,9 @@ Any other argument is ignored. If the user wants a narrower or different action 
    - Use `MAIN_OBSIDIAN_ROOT`, then `OBSIDIAN_VAULT`, then `~/notes/work`.
 
 2. Audit the environment (always run this first).
-   - Invoke `scripts/audit_env.py` (add `--upgrade` if the user asked for upgrades; add `--json` if you need machine-readable output for follow-on logic).
+   - You MUST invoke the audit by running the single command `python3 skills/setup/scripts/audit_env.py` (from the plugin root). Add `--upgrade` when the user passed `upgrade`. Add `--json` if you need machine-readable output for follow-on logic. Do NOT re-implement the audit inline by calling `gt --version`, `gh release view`, `rtk --version`, `pipx list`, etc. yourself — the script is the canonical audit and it exists specifically so the checks stay consistent across runs and versions.
    - The script checks: `gt`, `graphify`, `rtk`, `gh`, `git`, `python3` — presence, installed version, latest upstream release (via `gh release view`), and status (`ok` / `outdated` / `missing` / `unknown`). It also reports GT root state, rig count, concierge config source, MCP-obsidian registration, and the RTK hook.
-   - Report the audit findings to the user before taking any install or repair action. "Outdated" tools are never auto-fixed — only presence gaps are auto-repaired in subsequent steps. If the user passed `upgrade`, run `--upgrade` so the script also invokes known upgrade commands for each outdated tool.
+   - Report the audit findings to the user before taking any install or repair action. "Outdated" tools are never auto-fixed — only presence gaps are auto-repaired in subsequent steps. If the user passed `upgrade`, pass `--upgrade` to the script so it also invokes known upgrade commands for each outdated tool.
    - Version comparison is semver-only. Tools built from source (e.g. `gt version HEAD-<sha>`) are reported as `unknown` — surface the installed string and the latest release tag side-by-side and let the user decide.
 
 3. Initialize or repair GT if needed.
