@@ -63,17 +63,12 @@ Use the helper scripts in `scripts/` for deterministic filesystem work.
 
 ## Arguments
 
-The default action is a full audit — do NOT ask the user what to do when `$ARGUMENTS` is empty. Run the audit first, report the findings, and only ask targeted follow-up questions about gaps the audit surfaced.
+`/concierge:setup` is a command, not a prompt. It takes exactly one optional argument:
 
-Recognized arguments (case-insensitive substring match is fine):
+- (no argument) — run the full audit. Report the findings. For gaps with safe automatic fixes (install missing tools via their standard installers, initialize the GT root at the resolved path, clone vault repos listed in the concierge config), run the fix. For anything that needs user input (missing concierge config, rig URLs that have not been provided), ask one targeted question. Never run upgrade commands.
+- `upgrade` — same as the default, plus run the known upgrade command for every tool flagged as outdated.
 
-- no args / `audit` / `status` — full audit, report only, no installs or upgrades
-- `upgrade` / `latest` / `--latest` — audit, then run known upgrade commands for any tool flagged outdated
-- `init` / `initialize` — audit, then fix gaps: install missing tools, initialize GT, clone vault repos, etc.
-- `add rig <url>` / `add rigs` — audit + targeted rig add only
-- `refresh graphify` — targeted Graphify refresh only
-
-When in doubt (ambiguous free-form input), run the audit first and then ask one targeted question about the user's intent based on what you found.
+Any other argument is ignored. If the user wants a narrower or different action (refresh Graphify, add a specific rig, set up a named project), that belongs to `/concierge:go`, not to `setup`. Do not try to interpret free-form English as a setup subcommand.
 
 ## Concierge Setup Workflow
 
@@ -84,7 +79,7 @@ When in doubt (ambiguous free-form input), run the audit first and then ask one 
 2. Audit the environment (always run this first).
    - Invoke `scripts/audit_env.py` (add `--upgrade` if the user asked for upgrades; add `--json` if you need machine-readable output for follow-on logic).
    - The script checks: `gt`, `graphify`, `rtk`, `gh`, `git`, `python3` — presence, installed version, latest upstream release (via `gh release view`), and status (`ok` / `outdated` / `missing` / `unknown`). It also reports GT root state, rig count, concierge config source, MCP-obsidian registration, and the RTK hook.
-   - Report the audit findings to the user before taking any install or repair action. "Outdated" is never auto-fixed — only presence gaps are auto-repaired in subsequent steps, and only when the user's intent is `init`/`initialize` (or the original free-form request implied repair).
+   - Report the audit findings to the user before taking any install or repair action. "Outdated" tools are never auto-fixed — only presence gaps are auto-repaired in subsequent steps. If the user passed `upgrade`, run `--upgrade` so the script also invokes known upgrade commands for each outdated tool.
    - Version comparison is semver-only. Tools built from source (e.g. `gt version HEAD-<sha>`) are reported as `unknown` — surface the installed string and the latest release tag side-by-side and let the user decide.
 
 3. Initialize or repair GT if needed.
@@ -189,9 +184,5 @@ Only the actions the user still needs to take.
 
 ## Examples
 
-- `/concierge:setup`
-- `/concierge:setup audit everything`
-- `/concierge:setup initialize the workspace and ask me for rig urls`
-- `/concierge:setup set up shop and growth`
-- `/concierge:setup refresh graphify on all rigs`
-- `/concierge:setup upgrade` (audit, then upgrade any outdated tools)
+- `/concierge:setup` — audit everything; auto-fix safe gaps; ask about anything that needs user input.
+- `/concierge:setup upgrade` — same, plus upgrade every outdated tool.
