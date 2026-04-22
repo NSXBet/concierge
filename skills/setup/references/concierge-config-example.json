@@ -1,0 +1,7 @@
+{
+  "shared": {
+    "Engineering": "git@github.com:your-org/obsidian-engineering.git",
+    "Team": "git@github.com:your-org/obsidian-<team-name>.git"
+  },
+  "user": "git@github.com:your-org/obsidian-user-<username>.git"
+}

@@ -145,34 +145,62 @@ export MAIN_GT_ROOT="$HOME/gt"
 export MAIN_OBSIDIAN_ROOT="$HOME/notes/work"
 ```
 
+### Concierge config
+
+The Obsidian vault is composed of independent git repositories — one per shared knowledge source plus one personal vault. Concierge reads the list of repositories from a JSON config.
+
+Resolution order:
+
+1. `CONCIERGE_CONFIG` environment variable (inline JSON). Takes precedence when set.
+2. `~/.concierge.json` file.
+3. If neither is present, `/concierge:setup` will collect the values conversationally on first run and write `~/.concierge.json` for you.
+
+Config shape:
+
+```json
+{
+  "shared": {
+    "Engineering": "git@github.com:your-org/obsidian-engineering.git",
+    "Team": "git@github.com:your-org/obsidian-<team>.git"
+  },
+  "user": "git@github.com:your-org/obsidian-user-<you>.git"
+}
+```
+
+- `user` is required. Everything concierge writes (project notes, plans, PR reviews, analyses) lives under `User/`.
+- `shared` is optional. Each entry becomes a subfolder under `Shared/` whose name is the key with its first character capitalized (`engineering` -> `Engineering`; `SecurityPlatform` stays `SecurityPlatform`).
+- URLs are cloned verbatim — use whichever form (SSH or HTTPS) has the right access for the repo.
+
+Inline JSON via env var (useful for CI or ephemeral environments):
+
+```bash
+export CONCIERGE_CONFIG='{"shared":{"Engineering":"git@github.com:acme/obsidian-engineering.git"},"user":"git@github.com:acme/obsidian-user-alice.git"}'
+```
+
 ### Vault structure
 
-Concierge expects (and creates if missing) this layout inside your Obsidian vault:
+Concierge builds the vault by cloning each configured repository into the vault root:
 
 ```
-<vault>/
+<vault>/                     # not a git repo itself; just a container
+  README.md                  # generated map of the vault
   Shared/
-    Standards/
-    Security/
-    Reliability/
-  Projects/
-    <Project>/
-      README.md
-      Convoys/        # feature/work-tracking notes
-      Decisions/      # durable architectural decisions
-      Notes/          # working notes and research
-  Plans/
-    <Project>/
+    <Name>/                  # one cloned repo per entry in config shared:
+  User/                      # cloned from config user:
+    Projects/<Project>/
+      Convoys/               # feature/work-tracking notes
+      Decisions/             # durable architectural decisions
+      Notes/                 # working notes and research
+    Plans/<Project>/
       <date>-<slug>.md              # structured plans
       <date>-<slug>-interview.md    # interview transcripts
-  PR-Reviews/
-    <project>/
-      <PR-number>/
-        <review-number>.md
-  Analysis/
-    <project>/
+    PR-Reviews/<project>/<PR-number>/
+      <review-number>.md
+    Analysis/<project>/
       <date>-<slug>.md
 ```
+
+Clone behavior is idempotent and fail-closed: missing folders are cloned fresh; folders already present with the matching origin are left alone; folders present with a different origin (or that are not git repos) cause setup to fail so nothing is silently overwritten.
 
 ## Setting up Obsidian
 

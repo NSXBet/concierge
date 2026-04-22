@@ -44,12 +44,20 @@ Resolve paths in this order unless the user says otherwise:
 - GT root: `MAIN_GT_ROOT`, then `GT_TOWN_ROOT`, then `~/gt`
 - Obsidian vault: `MAIN_OBSIDIAN_ROOT`, then `OBSIDIAN_VAULT`, then `~/notes/work`
 
-Default structure:
+Obsidian vault layout is composition-based: the vault root is an unversioned container holding one git repo per top-level folder.
 
-- Shared folders: `Shared/Standards`, `Shared/Security`, `Shared/Reliability`
-- Project folders: `Projects/<Project>/{Convoys,Decisions,Notes}`
-- Graphify scope: each rig's canonical repo clone at `<gt-root>/<rig>/mayor/rig`
-- Graphify policy: install if missing, refresh if present
+- `Shared/<Name>/` — one directory per entry in `shared:` from the concierge config, each cloned from its configured git URL.
+- `User/` — cloned from `user:` in the concierge config. All skill-managed folders (`Projects/`, `Plans/`, `PR-Reviews/`, `Analysis/`, etc.) live under `User/`.
+- Graphify scope: each rig's canonical repo clone at `<gt-root>/<rig>/mayor/rig`.
+- Graphify policy: install if missing, refresh if present.
+
+Concierge config resolution order:
+
+1. `$CONCIERGE_CONFIG` — inline JSON with the full config (`{"shared": {...}, "user": "<url>"}`). Takes precedence when set.
+2. `~/.concierge.json` — persistent config file with the same shape.
+3. Neither set — first-run flow: collect `user` URL and any `shared` entries conversationally, write `~/.concierge.json`, then proceed.
+
+`user` is required. `shared` is optional (empty object or omitted key is fine). Folder names under `Shared/` come from each key with its first character capitalized (`engineering` -> `Engineering`; `SecurityPlatform` stays `SecurityPlatform`).
 
 Use the helper scripts in `scripts/` for deterministic filesystem work.
 
@@ -80,10 +88,21 @@ If `$ARGUMENTS` is empty or vague, ask one concise question:
    - Use `gt init` only when the user explicitly points at an existing local git repo that should be initialized in place.
 
 4. Create or repair the Obsidian vault structure.
-   - Use `scripts/bootstrap_obsidian.py`.
-   - Create shared folders even if no projects are supplied.
-   - For existing rigs or user-named projects, create project note folders and stub notes if missing.
-   - Do not overwrite user-authored notes.
+   - Resolve the concierge config:
+     a. If `$CONCIERGE_CONFIG` is set, treat its value as inline JSON and use that.
+     b. Else if `~/.concierge.json` exists, read it.
+     c. Else enter first-run flow: ask the user for their `user:` git URL (required) and any `shared:` entries they want (name + git URL, repeatable; blank to finish). Write the collected map to `~/.concierge.json` as valid JSON.
+   - Validate the config before running the script:
+     - `user` must be present and a string URL.
+     - `shared` (if present) must be an object mapping display name to git URL.
+   - Invoke `scripts/bootstrap_obsidian.py --apply`. The script will:
+     - Clone each `shared.<Name>` entry to `Shared/<Name>/` (first-char-capitalized key).
+     - Clone `user:` to `User/`.
+     - For any target that already exists and matches the expected remote, skip it (no `git pull`).
+     - For any target that exists but is not a git repo or has a different origin, fail with a clear message. Do not mutate or delete anything.
+     - On full success, write the vault-root `README.md` from `references/vault-root-readme.md.tmpl`.
+   - If the script exits nonzero, surface the error verbatim to the user and stop. Setup is all-or-nothing for the vault.
+   - Do not overwrite user-authored notes. The script only writes the vault-root `README.md`; everything else is owned by the individual repos.
 
 5. Ensure the Obsidian MCP server is connected.
    - Check whether `mcp-obsidian` (or `mcp__mcp-obsidian__obsidian_list_files_in_vault`) is available as an MCP tool.

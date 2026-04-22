@@ -6,7 +6,7 @@ Use these templates when creating or updating notes in the default vault.
 
 Path:
 
-`Projects/<Project>/README.md`
+`User/Projects/<Project>/README.md`
 
 Suggested content:
 
@@ -32,7 +32,7 @@ Suggested content:
 
 Path:
 
-`Projects/<Project>/Convoys/<feature-slug>.md`
+`User/Projects/<Project>/Convoys/<feature-slug>.md`
 
 Suggested content:
 
@@ -67,7 +67,7 @@ Suggested content:
 
 Path:
 
-`Projects/<Project>/Decisions/README.md`
+`User/Projects/<Project>/Decisions/README.md`
 
 Suggested content:
 
@@ -82,7 +82,7 @@ Suggested content:
 
 Path:
 
-`PR-Reviews/<project>/<PR-number>/<review-number>.md`
+`User/PR-Reviews/<project>/<PR-number>/<review-number>.md`
 
 Suggested content:
 
@@ -126,7 +126,7 @@ Suggested content:
 
 Path:
 
-`Analysis/<project>/<YYYY-MM-DD>-<headline-slug>.md`
+`User/Analysis/<project>/<YYYY-MM-DD>-<headline-slug>.md`
 
 Suggested content:
 
@@ -158,14 +158,15 @@ Suggested content:
 |---|-----|-----|
 ```
 
-## Shared structure
+## Vault structure
 
-Ensure these folders exist:
+The vault is composed of independent git repositories — do not create or rename top-level folders. `Shared/<Name>/` repos are owned by whoever publishes each standards vault; `User/` is the personal vault from the concierge config.
 
-- `Shared/Standards`
-- `Shared/Security`
-- `Shared/Reliability`
-- `Projects`
-- `Plans`
-- `Analysis`
-- `PR-Reviews`
+Skill-managed folders all live under `User/` and are created on demand:
+
+- `User/Projects/`
+- `User/Plans/`
+- `User/Analysis/`
+- `User/PR-Reviews/`
+- `User/Decisions/`
+- `User/Operations/`

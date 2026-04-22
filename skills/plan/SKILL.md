@@ -24,8 +24,8 @@ metadata:
   default_gt_envs: MAIN_GT_ROOT, GT_TOWN_ROOT
   default_obsidian_envs: MAIN_OBSIDIAN_ROOT, OBSIDIAN_VAULT
   graphify_policy: scan_on_rig_mention_then_on_demand
-  plan_output: Plans/{project}/{yyyy-mm-dd}-{slug}.md
-  transcript_output: Plans/{project}/{yyyy-mm-dd}-{slug}-interview.md
+  plan_output: User/Plans/{project}/{yyyy-mm-dd}-{slug}.md
+  transcript_output: User/Plans/{project}/{yyyy-mm-dd}-{slug}-interview.md
 ---
 
 # Concierge Plan
@@ -112,16 +112,16 @@ Pick 1-3 or type your own approach.
 
 **Lint/format discovery:**
 
-For each rig involved, check if lint and format commands are documented in Obsidian (`Projects/{project}/Notes/rig-tooling.md`). If not, ask the user:
+For each rig involved, check if lint and format commands are documented in Obsidian (`User/Projects/{project}/Notes/rig-tooling.md`). If not, ask the user:
 
 - How do you run linting for this rig? (e.g. `npm run lint`, `ruff check .`, `golangci-lint run`)
 - How do you run formatting? (e.g. `npm run format`, `ruff format .`, `gofmt -w .`)
 
-Record the answers in the plan's Technology Decisions section AND write them to `Projects/{project}/Notes/rig-tooling.md` in the vault so future plans don't need to ask again.
+Record the answers in the plan's Technology Decisions section AND write them to `User/Projects/{project}/Notes/rig-tooling.md` in the vault so future plans don't need to ask again.
 
 ### Phase 4: Plan generation
 
-Once all decisions are made, generate the plan and interview transcript (see Output Format below). Write both files to the vault. Create the `Plans/{project}/` directory if it does not exist.
+Once all decisions are made, generate the plan and interview transcript (see Output Format below). Write both files to the vault. Create the `User/Plans/{project}/` directory if it does not exist.
 
 ### Phase 5: Handoff offer
 
@@ -137,7 +137,7 @@ If the user wants changes, update the plan and stay in `Draft`. When the user ap
 
 ## Output Format: Plan
 
-Path: `Plans/{project}/{yyyy-mm-dd}-{slug}.md`
+Path: `User/Plans/{project}/{yyyy-mm-dd}-{slug}.md`
 
 ```md
 # {Title}
@@ -250,7 +250,7 @@ Target 5-15 phases and 10-30 milestones per phase, but the actual count should m
 
 ## Output Format: Interview Transcript
 
-Path: `Plans/{project}/{yyyy-mm-dd}-{slug}-interview.md`
+Path: `User/Plans/{project}/{yyyy-mm-dd}-{slug}-interview.md`
 
 ```md
 # Interview: {Title}

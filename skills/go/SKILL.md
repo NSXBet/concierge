@@ -158,11 +158,11 @@ Use this path when the user wants a code review on a PR. The review is saved to 
    - For large PRs, also fetch the file list with `gh pr view <number> --repo <owner/repo> --json files`.
 
 3. Determine the review number.
-   - Check if `PR-Reviews/<project>/<PR-number>/` exists in the Obsidian vault.
+   - Check if `User/PR-Reviews/<project>/<PR-number>/` exists in the Obsidian vault.
    - Count existing review files. The next number is `max + 1`. First review is `1`.
 
 4. Read relevant project context.
-   - Check the Obsidian `Projects/<project>/` notes for architecture context.
+   - Check the Obsidian `User/Projects/<project>/` notes for architecture context.
    - If Graphify exists on the rig, use `graphify query` to understand affected code paths.
 
 5. Perform the review.
@@ -182,7 +182,7 @@ Use this path when the user wants a code review on a PR. The review is saved to 
    - For each finding, record: severity, file path, line range, description, and suggested fix.
 
 6. Write the Obsidian review note.
-   - Path: `PR-Reviews/<project>/<PR-number>/<review-number>.md`
+   - Path: `User/PR-Reviews/<project>/<PR-number>/<review-number>.md`
    - Use the review note template from `references/note-templates.md`.
 
 7. Post to GitHub (only if the user asks, or confirm before posting).
@@ -230,8 +230,8 @@ If the foundation is missing across many rigs or the vault needs a broad bootstr
 
 ## Notes Policy
 
-1. Keep one project area under `Projects/<Project>/`.
-2. Keep one feature note under `Projects/<Project>/Convoys/<slug>.md` even if the user never sees the convoy ID.
+1. Keep one project area under `User/Projects/<Project>/`.
+2. Keep one feature note under `User/Projects/<Project>/Convoys/<slug>.md` even if the user never sees the convoy ID.
 3. Use the `Decisions` folder for durable choices, not transient status.
 4. Append short, factual updates. Do not rewrite the whole note unless structure is broken.
 5. If Obsidian CLI is unavailable, edit the markdown files directly. The vault is just a folder of markdown files.
