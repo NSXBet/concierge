@@ -23,7 +23,7 @@ Add the marketplace and install the plugin:
 
 ```
 /plugin marketplace add NSXBet/concierge
-/plugin install concierge@NSXBet-concierge
+/plugin install concierge@nsxbet-concierge
 ```
 
 ### Set up your environment

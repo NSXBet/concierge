@@ -1,7 +1,7 @@
 {
     "name": "concierge",
     "description": "concierge is a set of skills for claude-code that allows a very opinionated usage of gastown (and some other tools) to speed even further creation/maintenance of projects.",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "author": {
         "name": "Bernardo Heynemann",
         "email": "bernardo.heynemann@nsxbet.com",

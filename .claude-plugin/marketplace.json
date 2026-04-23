@@ -1,0 +1,16 @@
+{
+  "name": "nsxbet-concierge",
+  "owner": {
+    "name": "NSXBet"
+  },
+  "metadata": {
+    "description": "Concierge marketplace — workflow automation for Claude Code built on Gastown, Obsidian, Graphify, and RTK."
+  },
+  "plugins": [
+    {
+      "name": "concierge",
+      "source": "./",
+      "description": "Conversational intake, planning, and environment setup for gastown/obsidian/graphify/rtk workspaces."
+    }
+  ]
+}
