@@ -22,7 +22,7 @@ Start features, continue previous work, review pull requests, check status, or b
 Add the marketplace and install the plugin:
 
 ```
-/plugin marketplace add NSXBet/concierge
+/plugin marketplace add nsxbet/concierge
 /plugin install concierge@nsxbet-concierge
 ```
 
