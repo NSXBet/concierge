@@ -186,16 +186,39 @@ class EnvChecks:
     concierge_config_present: bool
     mcp_obsidian_present: bool
     rtk_hook_installed: bool
+    narrow_refspec_rigs: list[str] = field(default_factory=list)
+
+
+WIDE_REFSPEC = "+refs/heads/*:refs/remotes/origin/*"
+
+
+def _read_rig_refspec(clone: Path) -> str | None:
+    proc = subprocess.run(
+        ["git", "-C", str(clone), "config", "--get-all", "remote.origin.fetch"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    out = proc.stdout.strip()
+    return out or None
 
 
 def env_checks() -> EnvChecks:
     gt_root = Path(os.environ.get("MAIN_GT_ROOT") or os.environ.get("GT_TOWN_ROOT") or "~/gt").expanduser()
     gt_initialized = (gt_root / "mayor").exists() and (gt_root / ".beads").exists()
     rigs_count = 0
+    narrow_refspec_rigs: list[str] = []
     if gt_root.exists():
-        for child in gt_root.iterdir():
+        for child in sorted(gt_root.iterdir()):
             if child.is_dir() and not child.name.startswith(".") and (child / "config.json").exists():
                 rigs_count += 1
+                clone = child / "mayor" / "rig"
+                if (clone / ".git").exists():
+                    refspec = _read_rig_refspec(clone)
+                    if refspec is not None and WIDE_REFSPEC not in refspec:
+                        narrow_refspec_rigs.append(child.name)
 
     vault_root = Path(os.environ.get("MAIN_OBSIDIAN_ROOT") or os.environ.get("OBSIDIAN_VAULT") or "~/notes/work").expanduser()
 
@@ -234,6 +257,7 @@ def env_checks() -> EnvChecks:
         concierge_config_present=concierge_config_present,
         mcp_obsidian_present=mcp_obsidian_present,
         rtk_hook_installed=rtk_hook_installed,
+        narrow_refspec_rigs=narrow_refspec_rigs,
     )
 
 
@@ -253,10 +277,15 @@ def render(tools: list[ToolResult], env: EnvChecks) -> str:
     lines.append(f"concierge_config  source={env.concierge_config_source} present={str(env.concierge_config_present).lower()}")
     lines.append(f"mcp_obsidian      present={str(env.mcp_obsidian_present).lower()}")
     lines.append(f"rtk_hook          installed={str(env.rtk_hook_installed).lower()}")
+    if env.narrow_refspec_rigs:
+        preview = ", ".join(env.narrow_refspec_rigs[:5])
+        if len(env.narrow_refspec_rigs) > 5:
+            preview += f", ... (+{len(env.narrow_refspec_rigs) - 5} more)"
+        lines.append(f"narrow_refspec    count={len(env.narrow_refspec_rigs)} rigs=[{preview}]")
     return "\n".join(lines)
 
 
-def run_upgrades(tools: list[ToolResult]) -> int:
+def run_upgrades(tools: list[ToolResult], env: EnvChecks) -> int:
     rc = 0
     for t in tools:
         if t.status != "outdated" or not t.upgrade_cmd:
@@ -265,6 +294,15 @@ def run_upgrades(tools: list[ToolResult]) -> int:
         code, out = run(t.upgrade_cmd, timeout=300)
         if code != 0:
             print(f"ERROR upgrade failed for {t.name}: {out}", file=sys.stderr)
+            rc = max(rc, 1)
+    if env.narrow_refspec_rigs:
+        widen_script = Path(__file__).with_name("widen_rig_refspec.py")
+        cmd = [sys.executable, str(widen_script), "--apply"]
+        print(f"WIDEN narrow-refspec rigs ({len(env.narrow_refspec_rigs)}): {' '.join(cmd)}")
+        code, out = run(cmd, timeout=600)
+        if out:
+            print(out)
+        if code != 0:
             rc = max(rc, 1)
     return rc
 
@@ -308,6 +346,7 @@ def main() -> int:
                 "concierge_config_present": env.concierge_config_present,
                 "mcp_obsidian_present": env.mcp_obsidian_present,
                 "rtk_hook_installed": env.rtk_hook_installed,
+                "narrow_refspec_rigs": env.narrow_refspec_rigs,
             },
         }
         print(json.dumps(payload, indent=2))
@@ -315,7 +354,7 @@ def main() -> int:
         print(render(tools, env))
 
     if args.upgrade:
-        return run_upgrades(tools)
+        return run_upgrades(tools, env)
     return 0
 
 
