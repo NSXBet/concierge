@@ -240,7 +240,10 @@ def main() -> int:
     else:
         print(render_text(reports, args.apply))
 
-    if any(r.status == "error" or r.error for r in reports):
+    # fetch_error counts as exit 1 so callers (audit_env.py --upgrade) can
+    # surface partial success — the refspec on disk is correct, but the
+    # subsequent fetch did not land the new branches.
+    if any(r.status == "error" or r.error or r.fetch_error for r in reports):
         return 1
     return 0
 
