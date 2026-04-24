@@ -1,0 +1,451 @@
+#!/usr/bin/env bash
+# gt-stack — thin helper for stacked pull requests on GitHub.
+#
+# Convention (read this before using):
+#   1. Each stacked branch carries exactly ONE commit ahead of its parent.
+#      Iterate with `git commit --amend` + `git push --force-with-lease`.
+#   2. Merge the stack strictly bottom-up: the branch whose base is `main`
+#      lands first. After each merge, run `gt-stack sync` to cascade.
+#   3. After any amend or parent-branch rewrite, run `gt-stack restack` so
+#      descendants sit on the new parent SHA.
+#
+# Parent chain is stored in .git/gt-stack/parents as `branch=parent` lines.
+# `main` is always the implicit root; do not record it as a branch.
+#
+# Commands:
+#   new <name> [--base <parent>]   create branch, record parent
+#   list [branch]                  print chain from branch back to main
+#   parent [branch]                print recorded parent
+#   children [branch]              print branches whose parent is <branch>
+#   restack [branch]               rebase branch (and its descendants) onto parent
+#   push [branch]                  force-with-lease push
+#   submit [branch] [--draft]      open/update PR with base = parent
+#   sync [--prune]                 detect merged branches, cascade descendants onto main
+#   help                           print this message
+
+set -euo pipefail
+
+GTSTACK_DIR=""
+PARENTS_FILE=""
+TRUNK="${GT_STACK_TRUNK:-main}"
+
+die() {
+    printf 'gt-stack: %s\n' "$*" >&2
+    exit 1
+}
+
+warn() {
+    printf 'gt-stack: %s\n' "$*" >&2
+}
+
+require_repo() {
+    git rev-parse --git-dir >/dev/null 2>&1 || die "not inside a git repository"
+    GTSTACK_DIR="$(git rev-parse --git-dir)/gt-stack"
+    PARENTS_FILE="$GTSTACK_DIR/parents"
+    mkdir -p "$GTSTACK_DIR"
+    [[ -f "$PARENTS_FILE" ]] || : >"$PARENTS_FILE"
+}
+
+current_branch() {
+    git symbolic-ref --short HEAD 2>/dev/null || die "HEAD is detached; check out a branch first"
+}
+
+branch_exists() {
+    git show-ref --verify --quiet "refs/heads/$1"
+}
+
+get_parent() {
+    local branch="$1"
+    awk -F= -v b="$branch" '$1 == b { print $2; found=1; exit } END { if (!found) exit 1 }' "$PARENTS_FILE" 2>/dev/null || return 1
+}
+
+set_parent() {
+    local branch="$1" parent="$2"
+    local tmp
+    tmp="$(mktemp)"
+    awk -F= -v b="$branch" '$1 != b { print }' "$PARENTS_FILE" >"$tmp"
+    printf '%s=%s\n' "$branch" "$parent" >>"$tmp"
+    sort -o "$tmp" "$tmp"
+    mv "$tmp" "$PARENTS_FILE"
+}
+
+drop_parent() {
+    local branch="$1"
+    local tmp
+    tmp="$(mktemp)"
+    awk -F= -v b="$branch" '$1 != b { print }' "$PARENTS_FILE" >"$tmp"
+    mv "$tmp" "$PARENTS_FILE"
+}
+
+all_tracked_branches() {
+    awk -F= '{ print $1 }' "$PARENTS_FILE"
+}
+
+children_of() {
+    local parent="$1"
+    awk -F= -v p="$parent" '$2 == p { print $1 }' "$PARENTS_FILE"
+}
+
+chain_of() {
+    # Print branch chain from the given branch back to trunk (inclusive).
+    # One line per branch, trunk last.
+    local branch="$1"
+    local cur="$branch"
+    local -a chain=()
+    local guard=0
+    while [[ -n "$cur" && "$cur" != "$TRUNK" ]]; do
+        chain+=("$cur")
+        cur="$(get_parent "$cur" 2>/dev/null || printf '%s' "$TRUNK")"
+        guard=$((guard + 1))
+        if (( guard > 100 )); then
+            die "cycle detected in parent chain starting at $branch"
+        fi
+    done
+    chain+=("$TRUNK")
+    printf '%s\n' "${chain[@]}"
+}
+
+ensure_clean_worktree() {
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        die "working tree has uncommitted changes; commit or stash first"
+    fi
+}
+
+# --- commands ---------------------------------------------------------------
+
+cmd_new() {
+    local name="" base=""
+    while (( $# )); do
+        case "$1" in
+            --base) base="${2:-}"; shift 2 ;;
+            --base=*) base="${1#--base=}"; shift ;;
+            -h|--help) usage_new; return 0 ;;
+            -*) die "unknown flag for 'new': $1" ;;
+            *) [[ -z "$name" ]] && name="$1" || die "unexpected argument: $1"; shift ;;
+        esac
+    done
+    [[ -n "$name" ]] || die "usage: gt-stack new <branch-name> [--base <parent>]"
+    [[ -z "$base" ]] && base="$(current_branch)"
+    branch_exists "$base" || die "base branch '$base' does not exist locally"
+    branch_exists "$name" && die "branch '$name' already exists"
+
+    git checkout -b "$name" "$base"
+    set_parent "$name" "$base"
+    printf 'gt-stack: created %s (parent=%s)\n' "$name" "$base"
+    printf '  Commit your single change on this branch, then run `gt-stack submit --draft`\n'
+}
+
+cmd_list() {
+    local branch="${1:-$(current_branch)}"
+    local -a chain=()
+    local line
+    while IFS= read -r line; do chain+=("$line"); done < <(chain_of "$branch")
+    # Print trunk -> ... -> branch, one per line with arrow formatting
+    local i
+    for (( i=${#chain[@]} - 1 ; i >= 0 ; i-- )); do
+        local name="${chain[$i]}"
+        local marker=""
+        [[ "$name" == "$branch" ]] && marker="  <- HEAD"
+        if (( i == ${#chain[@]} - 1 )); then
+            printf '  %s (trunk)\n' "$name"
+        else
+            printf '    | %s%s\n' "$name" "$marker"
+        fi
+    done
+}
+
+cmd_parent() {
+    local branch="${1:-$(current_branch)}"
+    local p
+    if p="$(get_parent "$branch" 2>/dev/null)"; then
+        printf '%s\n' "$p"
+    else
+        # Untracked branches implicitly parent on trunk
+        printf '%s\n' "$TRUNK"
+    fi
+}
+
+cmd_children() {
+    local branch="${1:-$(current_branch)}"
+    children_of "$branch"
+}
+
+# Rebase a single branch onto its recorded parent. Does NOT cascade.
+# Relies on the one-commit-per-branch convention: the fork point is
+# always <branch>^, the parent of the branch's single commit. This keeps
+# cascading restacks correct even after the parent's own tip SHA has moved,
+# because <branch> has not been rewritten yet so <branch>^ still points at
+# the parent's old tip — which is exactly what `git rebase --onto` needs.
+#
+# Violating the one-commit rule (multiple commits on a stacked branch) will
+# silently drop the earlier commits during restack. gt-stack does not guard
+# against this; the convention is enforced by discipline (amend + force-push)
+# and documented in CONCIERGE_STACK.md.
+rebase_onto_parent() {
+    local branch="$1"
+    local parent
+    parent="$(get_parent "$branch" 2>/dev/null || printf '%s' "$TRUNK")"
+    branch_exists "$parent" || die "parent branch '$parent' of '$branch' does not exist"
+
+    # If the branch has no commits of its own (just created, nothing committed),
+    # there is nothing to rebase.
+    local branch_tip
+    branch_tip="$(git rev-parse "$branch")"
+    local parent_tip
+    parent_tip="$(git rev-parse "$parent")"
+    if [[ "$branch_tip" == "$parent_tip" ]]; then
+        return 0
+    fi
+
+    local fork
+    fork="$(git rev-parse "$branch^")"
+    if [[ "$fork" == "$parent_tip" ]]; then
+        return 0  # already based on parent's current tip
+    fi
+    git checkout "$branch"
+    git rebase --onto "$parent" "$fork" "$branch"
+}
+
+cmd_restack() {
+    ensure_clean_worktree
+    local start="${1:-$(current_branch)}"
+    local saved
+    saved="$(current_branch)"
+
+    # Walk descendants breadth-first starting from `start`.
+    # Order: rebase `start` first, then each child, then their children.
+    local -a queue=("$start") visited=()
+    while (( ${#queue[@]} )); do
+        local b="${queue[0]}"
+        queue=("${queue[@]:1}")
+        case " ${visited[*]-} " in *" $b "*) continue ;; esac
+        visited+=("$b")
+
+        if [[ "$b" != "$TRUNK" ]]; then
+            printf 'gt-stack: rebasing %s onto %s\n' "$b" "$(cmd_parent "$b")"
+            rebase_onto_parent "$b"
+        fi
+
+        local c
+        while IFS= read -r c; do
+            [[ -n "$c" ]] && queue+=("$c")
+        done < <(children_of "$b")
+    done
+
+    git checkout "$saved"
+    printf 'gt-stack: restack complete\n'
+}
+
+cmd_push() {
+    local branch="${1:-$(current_branch)}"
+    branch_exists "$branch" || die "branch '$branch' does not exist"
+    # Use --force-with-lease=<ref>:<expect> so we only clobber our own push,
+    # never a collaborator's.
+    if git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+        local remote_ref
+        remote_ref="$(git rev-parse "refs/remotes/origin/$branch")"
+        git push --force-with-lease="refs/heads/$branch:$remote_ref" origin "$branch"
+    else
+        git push -u origin "$branch"
+    fi
+}
+
+cmd_submit() {
+    local branch="" draft=0
+    while (( $# )); do
+        case "$1" in
+            --draft) draft=1; shift ;;
+            -h|--help) usage_submit; return 0 ;;
+            -*) die "unknown flag for 'submit': $1" ;;
+            *) [[ -z "$branch" ]] && branch="$1" || die "unexpected argument: $1"; shift ;;
+        esac
+    done
+    [[ -z "$branch" ]] && branch="$(current_branch)"
+    command -v gh >/dev/null 2>&1 || die "gh CLI not installed"
+
+    # Ensure the branch is pushed.
+    cmd_push "$branch"
+
+    local parent
+    parent="$(cmd_parent "$branch")"
+
+    # Is there already a PR for this branch?
+    local pr_number
+    pr_number="$(gh pr list --head "$branch" --state open --json number -q '.[0].number' 2>/dev/null || true)"
+
+    if [[ -n "$pr_number" ]]; then
+        # Update: ensure base is the recorded parent, flip draft state.
+        gh pr edit "$pr_number" --base "$parent" >/dev/null
+        if (( draft )); then
+            gh pr ready "$pr_number" --undo 2>/dev/null || true
+        else
+            gh pr ready "$pr_number" 2>/dev/null || true
+        fi
+        printf 'gt-stack: updated PR #%s (base=%s, draft=%s)\n' "$pr_number" "$parent" "$draft"
+    else
+        local flags=("--base" "$parent" "--head" "$branch" "--fill")
+        (( draft )) && flags+=("--draft")
+        gh pr create "${flags[@]}"
+    fi
+}
+
+# Detect which tracked branches have been merged into trunk.
+merged_branches() {
+    command -v gh >/dev/null 2>&1 || return 0
+    local b
+    while IFS= read -r b; do
+        [[ -z "$b" ]] && continue
+        local state
+        state="$(gh pr list --head "$b" --state merged --json number,state -q '.[0].state' 2>/dev/null || true)"
+        if [[ "$state" == "MERGED" ]]; then
+            printf '%s\n' "$b"
+        fi
+    done < <(all_tracked_branches)
+}
+
+cmd_sync() {
+    local prune=0
+    while (( $# )); do
+        case "$1" in
+            --prune) prune=1; shift ;;
+            -h|--help) usage_sync; return 0 ;;
+            *) die "unknown argument for 'sync': $1" ;;
+        esac
+    done
+
+    ensure_clean_worktree
+    command -v gh >/dev/null 2>&1 || die "gh CLI not installed"
+
+    git fetch origin --prune
+    git checkout "$TRUNK"
+    # Update local trunk to match origin via rebase — never merge commits.
+    # If there are no divergent commits this is a fast-forward; if there
+    # are local-only commits on trunk they replay on top of origin.
+    if git show-ref --verify --quiet "refs/remotes/origin/$TRUNK"; then
+        git rebase "refs/remotes/origin/$TRUNK"
+    fi
+
+    local -a merged=()
+    local line
+    while IFS= read -r line; do [[ -n "$line" ]] && merged+=("$line"); done < <(merged_branches)
+    if (( ${#merged[@]} == 0 )); then
+        printf 'gt-stack: no tracked branches have merged PRs\n'
+        return 0
+    fi
+
+    printf 'gt-stack: detected merged branches: %s\n' "${merged[*]}"
+
+    # For every descendant of a merged branch, reparent onto the closest
+    # non-merged ancestor (falling back to trunk).
+    local b parent new_parent
+    for b in $(all_tracked_branches); do
+        # Skip the merged branches themselves
+        case " ${merged[*]} " in *" $b "*) continue ;; esac
+        parent="$(get_parent "$b" 2>/dev/null || printf '%s' "$TRUNK")"
+        new_parent="$parent"
+        local guard=0
+        while :; do
+            case " ${merged[*]} " in
+                *" $new_parent "*)
+                    if [[ "$new_parent" == "$TRUNK" ]]; then break; fi
+                    new_parent="$(get_parent "$new_parent" 2>/dev/null || printf '%s' "$TRUNK")"
+                    ;;
+                *) break ;;
+            esac
+            guard=$((guard + 1))
+            (( guard > 100 )) && die "cycle detected while reparenting $b"
+        done
+        if [[ "$new_parent" != "$parent" ]]; then
+            set_parent "$b" "$new_parent"
+            printf 'gt-stack: reparented %s: %s -> %s\n' "$b" "$parent" "$new_parent"
+        fi
+    done
+
+    # Drop merged branches from tracking
+    for b in "${merged[@]}"; do
+        drop_parent "$b"
+        if (( prune )) && branch_exists "$b"; then
+            git branch -D "$b" || warn "could not delete local branch $b"
+        fi
+    done
+
+    # Rebase every remaining tracked branch onto its (possibly new) parent.
+    # Process bottom-up: those parented on trunk first, then their children, etc.
+    local -a processed=()
+    local changed=1
+    while (( changed )); do
+        changed=0
+        for b in $(all_tracked_branches); do
+            case " ${processed[*]-} " in *" $b "*) continue ;; esac
+            parent="$(get_parent "$b" 2>/dev/null || printf '%s' "$TRUNK")"
+            if [[ "$parent" == "$TRUNK" ]] || \
+               { case " ${processed[*]-} " in *" $parent "*) true ;; *) false ;; esac; }; then
+                printf 'gt-stack: rebasing %s onto %s\n' "$b" "$parent"
+                rebase_onto_parent "$b" || warn "rebase of $b failed; resolve conflicts and re-run"
+                processed+=("$b")
+                changed=1
+            fi
+        done
+    done
+
+    printf 'gt-stack: sync complete. Remember to `gt-stack submit` each remaining branch to retarget its PR base and push the rebased SHA.\n'
+}
+
+# --- usage ------------------------------------------------------------------
+
+usage_new() { printf 'usage: gt-stack new <branch-name> [--base <parent>]\n'; }
+usage_submit() { printf 'usage: gt-stack submit [branch] [--draft]\n'; }
+usage_sync() { printf 'usage: gt-stack sync [--prune]\n'; }
+
+usage() {
+    cat <<'EOF'
+gt-stack — thin helper for stacked pull requests on GitHub.
+
+Convention: one commit per branch. Iterate with `git commit --amend` +
+`git push --force-with-lease`. Merge bottom-up. Restack after every amend
+or merge.
+
+Commands:
+  new <name> [--base <parent>]   create branch off parent (default: current)
+  list [branch]                  print chain from branch back to trunk
+  parent [branch]                print recorded parent
+  children [branch]              print branches parented on <branch>
+  restack [branch]               rebase branch (and descendants) onto parent
+  push [branch]                  force-with-lease push (safe)
+  submit [branch] [--draft]      open/update PR with base = recorded parent
+  sync [--prune]                 after merges: reparent descendants, cascade rebases
+  help                           this message
+
+Environment:
+  GT_STACK_TRUNK                 trunk branch name (default: main)
+
+State:
+  .git/gt-stack/parents          branch=parent, one per line
+
+Replies on a PR should describe the change anchored by file + symbol, not
+commit SHA — amend + force-push rewrites SHAs routinely, and stacked-PR
+restacks cascade that churn across the whole stack. See the Change-Workflow
+document (Shared/Engineering/Standards/Change-Workflow.md) §5.
+EOF
+}
+
+# --- dispatch ---------------------------------------------------------------
+
+main() {
+    local cmd="${1:-help}"
+    shift || true
+    case "$cmd" in
+        new) require_repo; cmd_new "$@" ;;
+        list) require_repo; cmd_list "$@" ;;
+        parent) require_repo; cmd_parent "$@" ;;
+        children) require_repo; cmd_children "$@" ;;
+        restack) require_repo; cmd_restack "$@" ;;
+        push) require_repo; cmd_push "$@" ;;
+        submit) require_repo; cmd_submit "$@" ;;
+        sync) require_repo; cmd_sync "$@" ;;
+        help|-h|--help) usage ;;
+        *) usage; die "unknown command: $cmd" ;;
+    esac
+}
+
+main "$@"

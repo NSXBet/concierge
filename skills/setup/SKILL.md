@@ -78,7 +78,7 @@ Any other argument is ignored. If the user wants a narrower or different action 
 
 2. Audit the environment (always run this first).
    - You MUST invoke the audit by running the single command `python3 skills/setup/scripts/audit_env.py` (from the plugin root). Add `--upgrade` when the user passed `upgrade`. Add `--json` if you need machine-readable output for follow-on logic. Do NOT re-implement the audit inline by calling `gt --version`, `gh release view`, `rtk --version`, `pipx list`, etc. yourself — the script is the canonical audit and it exists specifically so the checks stay consistent across runs and versions.
-   - The script checks: `gt`, `graphify`, `rtk`, `gh`, `git`, `python3` — presence, installed version, latest upstream release (via `gh release view`), and status (`ok` / `outdated` / `missing` / `unknown`). It also reports GT root state, rig count, concierge config source, MCP-obsidian registration, and the RTK hook.
+   - The script checks: `gt`, `gt-stack`, `graphify`, `rtk`, `gh`, `git`, `python3` — presence, installed version, latest upstream release (via `gh release view`), and status (`ok` / `outdated` / `missing` / `unknown`). It also reports GT root state, rig count, concierge config source, MCP-obsidian registration, and the RTK hook.
    - Report the audit findings to the user before taking any install or repair action. "Outdated" tools are never auto-fixed — only presence gaps are auto-repaired in subsequent steps. If the user passed `upgrade`, pass `--upgrade` to the script so it also invokes known upgrade commands for each outdated tool.
    - Version comparison is semver-only. Tools built from source (e.g. `gt version HEAD-<sha>`) are reported as `unknown` — surface the installed string and the latest release tag side-by-side and let the user decide.
 
@@ -89,6 +89,12 @@ Any other argument is ignored. If the user wants a narrower or different action 
    - Accept repo inputs as raw URLs or `name=url` pairs.
    - Prefer `gt rig add <name> <url>` for remote repos.
    - Use `gt init` only when the user explicitly points at an existing local git repo that should be initialized in place.
+
+3b. Install the `gt-stack` helper.
+   - Use `scripts/ensure_gt_stack.py --apply`.
+   - The script symlinks `bin/gt-stack` from the plugin into `~/.local/bin` (or `$GT_STACK_BIN_DIR`). Idempotent on re-run.
+   - If `~/.local/bin` is not on `PATH`, the script prints the `export PATH=…` line the user should add to their shell profile; surface that note verbatim.
+   - `gt-stack` is a thin helper over `git` + `gh` for stacked pull requests. It assumes the one-commit-per-branch convention and provides `new`, `list`, `restack`, `submit`, and `sync` verbs. See `CONCIERGE_STACK.md` at the plugin root for the convention and workflow.
 
 4. Create or repair the Obsidian vault structure.
    - Resolve the concierge config:
