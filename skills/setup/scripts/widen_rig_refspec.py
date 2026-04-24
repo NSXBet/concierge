@@ -68,8 +68,12 @@ def discover_rigs(gt_root: Path) -> list[str]:
     for child in sorted(gt_root.iterdir()):
         if not child.is_dir() or child.name.startswith("."):
             continue
-        # A rig directory has a canonical clone at mayor/rig/.git.
-        if (child / "mayor" / "rig" / ".git").exists():
+        # A rig directory has config.json plus a canonical clone at
+        # mayor/rig/.git. Matches the discovery predicate in
+        # skills/setup/scripts/ensure_gt.py and audit_env.py.
+        if (child / "config.json").exists() and (
+            child / "mayor" / "rig" / ".git"
+        ).exists():
             rigs.append(child.name)
     return rigs
 
@@ -132,8 +136,13 @@ def widen_rig(gt_root: Path, name: str, apply: bool) -> RigReport:
         return report
 
     if not already_wide:
+        # --replace-all normalises multi-value `remote.origin.fetch` configs.
+        # A bare `git config <key> <value>` errors (exit 5) when the key
+        # already has more than one entry, which `current_refspec()` reads
+        # via --get-all precisely because that state is possible.
         rc, out = run_git(
-            ["config", "remote.origin.fetch", WILDCARD_REFSPEC], clone
+            ["config", "--replace-all", "remote.origin.fetch", WILDCARD_REFSPEC],
+            clone,
         )
         if rc != 0:
             report.status = "error"
