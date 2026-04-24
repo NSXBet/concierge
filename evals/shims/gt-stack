@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# gt-stack shim for Layer-2 evals.
+# Logs every call so the scenario can assert the agent invoked it with
+# the expected verbs (new, submit --draft, list, sync). Returns success
+# for the verbs the skills are documented to call, so the agent does not
+# branch into a recovery path.
+
+LOG="${CONCIERGE_EVAL_CALL_LOG:-/dev/null}"
+echo "gt-stack $*" >> "$LOG"
+
+case "$1" in
+  help|-h|--help|"")
+    printf 'gt-stack (eval shim) — commands: new list parent children restack push submit sync\n'
+    ;;
+  new)
+    shift
+    printf 'gt-stack: created %s (shim)\n' "${1:-<unnamed>}"
+    ;;
+  list)
+    printf '  main (trunk)\n'
+    ;;
+  parent)
+    printf 'main\n'
+    ;;
+  children)
+    :
+    ;;
+  restack|push)
+    printf 'gt-stack: %s ok (shim)\n' "$1"
+    ;;
+  submit)
+    shift
+    printf 'gt-stack: submitted (shim) args=%s\n' "$*"
+    ;;
+  sync)
+    printf 'gt-stack: no tracked branches have merged PRs (shim)\n'
+    ;;
+  *)
+    echo "gt-stack-shim: unhandled: $*" >&2
+    exit 0
+    ;;
+esac
