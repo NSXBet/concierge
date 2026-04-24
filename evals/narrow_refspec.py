@@ -87,7 +87,7 @@ def run() -> int:
 
     mentioned_narrow = any(
         kw in text_raw.lower()
-        for kw in ["refspec", "widen", "narrow", "branches"]
+        for kw in ["refspec", "widen", "narrow"]
     )
 
     failures: list[str] = []

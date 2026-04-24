@@ -44,12 +44,13 @@ WILDCARD_REFSPEC = "+refs/heads/*:refs/remotes/origin/*"
 class RigReport:
     name: str
     clone_path: str
-    status: str              # ok | widened | skipped | error
+    status: str              # ok | widened | narrow | skipped | error
     refspec_before: str | None
     refspec_after: str | None
     branches_before: int
     branches_after: int
     error: str | None = None
+    fetch_error: str | None = None
 
 
 def resolve_gt_root() -> Path:
@@ -139,15 +140,13 @@ def widen_rig(gt_root: Path, name: str, apply: bool) -> RigReport:
             report.error = f"git config failed: {out}"
             return report
 
-    # Always fetch — widening without fetch would leave the branches
-    # invisible until the next fetch, and fetching on an already-wide repo
-    # just pulls any newly-pushed branches.
+    # Refspec is now correct on disk. Fetch is best-effort — a fetch
+    # failure (network, auth, unreachable origin) must not mask the fact
+    # that the config change landed, so we record it separately and keep
+    # status tied to the refspec outcome.
     rc, out = run_git(["fetch", "origin", "--prune", "--quiet"], clone)
     if rc != 0:
-        report.status = "error"
-        report.error = f"git fetch failed: {out}"
-        return report
-
+        report.fetch_error = out
     report.refspec_after = current_refspec(clone)
     report.branches_after = count_remote_branches(clone)
     report.status = "ok" if already_wide else "widened"
@@ -169,12 +168,18 @@ def render_text(reports: list[RigReport], apply: bool) -> str:
         lines.append(f"{r.name:<44} {r.status:<10} {before:>7} {after:>7}")
         if r.error:
             lines.append(f"    error: {r.error}")
+        if r.fetch_error:
+            lines.append(f"    fetch failed (config widened): {r.fetch_error}")
     widened = sum(1 for r in reports if r.status == "widened")
     narrow = sum(1 for r in reports if r.status == "narrow")
     errors = sum(1 for r in reports if r.status == "error")
+    fetch_errors = sum(1 for r in reports if r.fetch_error)
     lines.append("")
     if apply:
-        lines.append(f"widened={widened} errors={errors}")
+        summary = f"widened={widened} errors={errors}"
+        if fetch_errors:
+            summary += f" fetch_errors={fetch_errors}"
+        lines.append(summary)
     else:
         lines.append(f"narrow={narrow} (run with --apply to widen)")
     return "\n".join(lines)
@@ -201,10 +206,18 @@ def main() -> int:
     args = parser.parse_args()
 
     gt_root = resolve_gt_root()
+    known_rigs = discover_rigs(gt_root)
     if args.rig:
+        if args.rig not in known_rigs:
+            print(
+                f"error: rig {args.rig!r} not found under {gt_root}. "
+                f"Known rigs: {', '.join(known_rigs) or '(none)'}",
+                file=sys.stderr,
+            )
+            return 2
         rigs = [args.rig]
     else:
-        rigs = discover_rigs(gt_root)
+        rigs = known_rigs
 
     reports = [widen_rig(gt_root, name, args.apply) for name in rigs]
 
@@ -218,7 +231,7 @@ def main() -> int:
     else:
         print(render_text(reports, args.apply))
 
-    if any(r.status == "error" for r in reports):
+    if any(r.status == "error" or r.error for r in reports):
         return 1
     return 0
 
