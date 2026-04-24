@@ -294,6 +294,57 @@ def seed_gt_root(gt_root: Path, rigs: list[str] | None = None) -> None:
         (gt_root / rig / "config.json").write_text("{}\n", encoding="utf-8")
 
 
+def seed_rig_clone(
+    gt_root: Path,
+    rig: str,
+    remote_url: str,
+    refspec: str = "+refs/heads/main:refs/remotes/origin/main",
+) -> Path:
+    """Replace a rig's `mayor/rig` stub with a real git repo configured with
+    the requested fetch refspec, so refspec-related logic can be exercised
+    end to end. Returns the clone path.
+
+    The default refspec mirrors what `gt rig add` ships today — narrow to
+    `main` only.
+    """
+    clone = gt_root / rig / "mayor" / "rig"
+    # Remove the stub directory if present, then re-init as a real repo.
+    if clone.exists():
+        shutil.rmtree(clone)
+    real_git_env = os.environ.copy()
+    real_git_env.pop("CONCIERGE_EVAL_CALL_LOG", None)
+    clone.mkdir(parents=True)
+    subprocess.run(
+        ["git", "init", "--quiet", str(clone)],
+        check=True,
+        env=real_git_env,
+    )
+    subprocess.run(
+        ["git", "-C", str(clone), "remote", "add", "origin", remote_url],
+        check=True,
+        env=real_git_env,
+    )
+    subprocess.run(
+        ["git", "-C", str(clone), "config", "remote.origin.fetch", refspec],
+        check=True,
+        env=real_git_env,
+    )
+    return clone
+
+
+def read_rig_refspec(clone: Path) -> str:
+    """Read the current fetch refspec on a rig clone using real git."""
+    real_git_env = os.environ.copy()
+    real_git_env.pop("CONCIERGE_EVAL_CALL_LOG", None)
+    proc = subprocess.run(
+        ["git", "-C", str(clone), "config", "--get-all", "remote.origin.fetch"],
+        capture_output=True,
+        text=True,
+        env=real_git_env,
+    )
+    return proc.stdout.strip()
+
+
 def write_concierge_config(sandbox: Sandbox, config: dict[str, Any]) -> Path:
     """Write `~/.concierge.json` inside the sandbox and return its path."""
     path = sandbox.home / ".concierge.json"
