@@ -3,6 +3,7 @@ name: go
 description: conversational intake and dispatch for gastown workspaces that use obsidian for notes, graphify for repo understanding, and rtk for shell-noise reduction. use when you want to describe work in plain language, continue previous work, start a new project, ask for status, or review a pull request, and want the agent to set up or repair gt, obsidian, graphify, and rtk as needed before dispatching work.
 allowed-tools:
   - Bash(gt *)
+  - Bash(gt-stack *)
   - Bash(bd *)
   - Bash(obsidian *)
   - Bash(graphify *)
@@ -111,7 +112,22 @@ Use this path when the user wants new work started in an existing project.
    - Use `gt sling <bead> <rig>` for polecat work.
    - Use `gt sling <bead>` only when already inside the target agent session.
    - Use `gt worktree <rig>` only for a quick supporting touch from an existing crew session.
+   - If the plan declares stacking (Technology Decisions row `Stacking = gt-stack`), apply the stack-aware dispatch below before sling-ing work.
 8. Tell the user what was started, what notes were created or updated, and any remaining blockers.
+
+### A.1. Stacked-PR dispatch
+
+When the plan declares `Stacking = gt-stack`:
+
+1. The plan's phase section lists a stack order (bottom-to-top). Each entry in the order maps to one PR and therefore one stacked branch.
+2. For each milestone in stack order, instruct the polecat session to use `gt-stack new <branch-name>` off the previous stacked branch (or off `main` for the bottom branch). Branch names should describe the slice in plain language (e.g. `phase1-observability`, `phase1-dashboards`).
+3. Enforce the single-commit-per-branch convention: the polecat must iterate with `git commit --amend` + `gt-stack submit`, not by adding new commits.
+4. The first branch in the stack becomes **ready-for-review** (`gt-stack submit`, no `--draft`); all branches above it open as **draft** (`gt-stack submit --draft`) until the one below them merges.
+5. After any merge, run `gt-stack sync` to detect the merge, reparent descendants onto `main`, cascade-rebase, and retarget the PR base via `gt-stack submit` on each remaining branch.
+6. Never use raw `git push --force` — `gt-stack push` and `gt-stack submit` already use `--force-with-lease=<ref>:<sha>` to avoid clobbering a collaborator's work.
+7. Communicate the stack state to the user in plain language: "Phase 1 is three stacked PRs; #293 is ready for review and #294 / #295 are drafts on top."
+
+For the full convention and the three rules (one commit per branch, merge bottom-up, restack after every amend or merge), see `CONCIERGE_STACK.md` at the plugin root.
 
 ### B. Continue previous work
 
@@ -126,8 +142,9 @@ Use this path when the user wants to resume something already in flight.
 2. If there is a single strong candidate, summarize it and continue.
 3. If there are multiple plausible candidates, show up to three choices in plain language and ask the user to pick one.
 4. Refresh Graphify for the active repo if it exists and looks stale.
-5. Update the feature note with current status and next steps.
-6. Dispatch follow-on work or nudge the right agent.
+5. If the work is part of a stack (parent file `.git/gt-stack/parents` has entries, or the plan declares stacking), check stack state: run `gt-stack list` from the working repo, report which PRs are ready vs. draft, and call out any that need a `gt-stack sync` (e.g. the bottom PR has merged since the last session).
+6. Update the feature note with current status and next steps.
+7. Dispatch follow-on work or nudge the right agent.
 
 ### C. New project
 
