@@ -260,6 +260,37 @@ cmd_push() {
     fi
 }
 
+# submit_one — push a single branch and create-or-update its PR.
+# Flips the PR's draft state per the `draft` flag, matching the existing
+# single-branch semantics. Used both by single-branch `submit <branch>` and
+# by the stack-wide submit walk below.
+submit_one() {
+    local branch="$1" draft="$2"
+    branch_exists "$branch" || die "branch '$branch' does not exist"
+
+    cmd_push "$branch"
+
+    local parent
+    parent="$(cmd_parent "$branch")"
+
+    local pr_number
+    pr_number="$(gh pr list --head "$branch" --state open --json number -q '.[0].number' 2>/dev/null || true)"
+
+    if [[ -n "$pr_number" ]]; then
+        gh pr edit "$pr_number" --base "$parent" >/dev/null
+        if (( draft )); then
+            gh pr ready "$pr_number" --undo 2>/dev/null || true
+        else
+            gh pr ready "$pr_number" 2>/dev/null || true
+        fi
+        printf 'gt-stack: updated PR #%s (head=%s, base=%s, draft=%s)\n' "$pr_number" "$branch" "$parent" "$draft"
+    else
+        local flags=("--base" "$parent" "--head" "$branch" "--fill")
+        (( draft )) && flags+=("--draft")
+        gh pr create "${flags[@]}"
+    fi
+}
+
 cmd_submit() {
     local branch="" draft=0
     while (( $# )); do
@@ -270,33 +301,42 @@ cmd_submit() {
             *) [[ -z "$branch" ]] && branch="$1" || die "unexpected argument: $1"; shift ;;
         esac
     done
-    [[ -z "$branch" ]] && branch="$(current_branch)"
     command -v gh >/dev/null 2>&1 || die "gh CLI not installed"
 
-    # Ensure the branch is pushed.
-    cmd_push "$branch"
-
-    local parent
-    parent="$(cmd_parent "$branch")"
-
-    # Is there already a PR for this branch?
-    local pr_number
-    pr_number="$(gh pr list --head "$branch" --state open --json number -q '.[0].number' 2>/dev/null || true)"
-
-    if [[ -n "$pr_number" ]]; then
-        # Update: ensure base is the recorded parent, flip draft state.
-        gh pr edit "$pr_number" --base "$parent" >/dev/null
-        if (( draft )); then
-            gh pr ready "$pr_number" --undo 2>/dev/null || true
-        else
-            gh pr ready "$pr_number" 2>/dev/null || true
-        fi
-        printf 'gt-stack: updated PR #%s (base=%s, draft=%s)\n' "$pr_number" "$parent" "$draft"
-    else
-        local flags=("--base" "$parent" "--head" "$branch" "--fill")
-        (( draft )) && flags+=("--draft")
-        gh pr create "${flags[@]}"
+    # Single-branch mode: explicit branch argument given.
+    if [[ -n "$branch" ]]; then
+        submit_one "$branch" "$draft"
+        return 0
     fi
+
+    # Stack-wide mode: walk current_branch + all descendants in BFS
+    # parent-first order, calling submit_one on each. This matches the
+    # post-restack flow — `gt-stack restack` has already rebased current
+    # and its descendants; one `gt-stack submit` then pushes each updated
+    # SHA and retargets each PR's base to its recorded parent. The --draft
+    # flag, if passed, flips every PR's draft state in the walk; for
+    # mixed-state stacks (bottom ready, top draft per the bottom-up merge
+    # convention), use single-branch `submit <branch>` calls to preserve
+    # the per-PR state.
+    local start
+    start="$(current_branch)"
+    [[ -z "$start" || "$start" == "$TRUNK" ]] && \
+        die "submit on no tracked branch (current = ${start:-detached}); pass a branch name or check out a tracked branch"
+
+    local -a queue=("$start") visited=()
+    while (( ${#queue[@]} )); do
+        local b="${queue[0]}"
+        queue=("${queue[@]:1}")
+        case " ${visited[*]-} " in *" $b "*) continue ;; esac
+        visited+=("$b")
+
+        submit_one "$b" "$draft"
+
+        local c
+        while IFS= read -r c; do
+            [[ -n "$c" ]] && queue+=("$c")
+        done < <(children_of "$b")
+    done
 }
 
 # Detect which tracked branches have been merged into trunk.
@@ -410,7 +450,23 @@ cmd_sync() {
 # --- usage ------------------------------------------------------------------
 
 usage_new() { printf 'usage: gt-stack new <branch-name> [--base <parent>]\n'; }
-usage_submit() { printf 'usage: gt-stack submit [branch] [--draft]\n'; }
+usage_submit() {
+    cat <<'EOF'
+usage: gt-stack submit [branch] [--draft]
+
+Without a branch argument: walks the current branch + all descendants in
+BFS parent-first order, pushing each and retargeting each PR's base to
+its recorded parent. This is the natural post-restack flow.
+
+With an explicit branch argument: operates on that branch only.
+
+The --draft flag flips PR draft state to draft (and its absence flips to
+ready) for every branch processed. For mixed-state stacks where the
+bottom should be ready and descendants stay draft (the bottom-up merge
+convention), use single-branch `submit <branch>` calls so per-PR state
+is preserved.
+EOF
+}
 usage_sync() { printf 'usage: gt-stack sync [--prune]\n'; }
 
 usage() {
@@ -428,7 +484,9 @@ Commands:
   children [branch]              print branches parented on <branch>
   restack [branch]               rebase branch (and descendants) onto parent
   push [branch]                  force-with-lease push (safe)
-  submit [branch] [--draft]      open/update PR with base = recorded parent
+  submit [branch] [--draft]      push + open/update PR with base = recorded parent.
+                                 No branch arg = stack-wide (current + descendants,
+                                 BFS parent-first). See `submit --help`.
   sync [--prune]                 after merges: reparent descendants, cascade rebases
   help                           this message
 

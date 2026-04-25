@@ -88,11 +88,17 @@ Two events invalidate the stack:
   helper detects merged PRs via `gh`, reparents in the metadata, and
   cascades rebases bottom-up (parents first, then descendants).
 
-After a restack or sync, call `gt-stack submit` once per affected
-branch: it force-with-lease-pushes the new SHA and updates the PR's
-base branch to match the recorded parent. `submit` operates on a
-single branch per invocation — there is no "submit the whole stack"
-shortcut.
+After a restack or sync, run `gt-stack submit` from any branch in the
+stack: with no arguments it walks the current branch + all descendants
+in parent-first order, force-with-lease-pushes each one, and updates
+each PR's base branch to match the recorded parent. To operate on a
+single branch, pass it explicitly: `gt-stack submit <branch>`.
+
+The `--draft` flag flips PR draft state to draft (and its absence flips
+to ready) for every branch processed. For mixed-state stacks where the
+bottom should be ready and descendants stay draft (the bottom-up merge
+convention), use single-branch `gt-stack submit <branch>` calls so each
+PR's draft state is preserved.
 
 ## Commands
 
@@ -140,10 +146,9 @@ When the bottom PR receives review feedback:
 ```bash
 # Fix the code, then amend + restack
 git commit --amend
-gt-stack restack                     # rebases descendants onto the new parent SHA
-gt-stack submit phase1-observability # one submit per branch — repeat for each
-gt-stack submit phase1-dashboards
-gt-stack submit phase1-runbook
+gt-stack restack    # rebases descendants onto the new parent SHA
+gt-stack submit     # from the bottom branch — pushes current + all descendants
+                    # use `gt-stack submit <branch>` to limit to one PR
 ```
 
 When it merges:
