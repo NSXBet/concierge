@@ -86,11 +86,13 @@ Two events invalidate the stack:
   parent was the merged branch now needs to be reparented onto `main`
   (or onto the next non-merged ancestor). Run `gt-stack sync` — the
   helper detects merged PRs via `gh`, reparents in the metadata, and
-  cascades rebases top-down.
+  cascades rebases bottom-up (parents first, then descendants).
 
-After a restack or sync, call `gt-stack submit` on each affected
+After a restack or sync, call `gt-stack submit` once per affected
 branch: it force-with-lease-pushes the new SHA and updates the PR's
-base branch to match the recorded parent.
+base branch to match the recorded parent. `submit` operates on a
+single branch per invocation — there is no "submit the whole stack"
+shortcut.
 
 ## Commands
 
@@ -138,8 +140,10 @@ When the bottom PR receives review feedback:
 ```bash
 # Fix the code, then amend + restack
 git commit --amend
-gt-stack restack        # cascades the new SHA to descendants
-gt-stack submit         # force-pushes all of them
+gt-stack restack                     # rebases descendants onto the new parent SHA
+gt-stack submit phase1-observability # one submit per branch — repeat for each
+gt-stack submit phase1-dashboards
+gt-stack submit phase1-runbook
 ```
 
 When it merges:
