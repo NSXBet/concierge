@@ -273,8 +273,15 @@ submit_one() {
     local parent
     parent="$(cmd_parent "$branch")"
 
-    local pr_number
-    pr_number="$(gh pr list --head "$branch" --state open --json number -q '.[0].number' 2>/dev/null || true)"
+    # Distinguish "no open PR for this branch" (legitimate empty result) from
+    # "gh failed" (auth, network, rate-limit). Suppressing the latter would
+    # silently fall through to `gh pr create` and risk duplicate PRs.
+    local pr_number gh_output gh_exit=0
+    gh_output="$(gh pr list --head "$branch" --state open --json number -q '.[0].number' 2>&1)" || gh_exit=$?
+    if (( gh_exit != 0 )); then
+        die "gh pr list failed for branch '$branch' (exit $gh_exit): $gh_output"
+    fi
+    pr_number="$gh_output"
 
     if [[ -n "$pr_number" ]]; then
         gh pr edit "$pr_number" --base "$parent" >/dev/null
@@ -345,8 +352,15 @@ merged_branches() {
     local b
     while IFS= read -r b; do
         [[ -z "$b" ]] && continue
-        local state
-        state="$(gh pr list --head "$b" --state merged --json number,state -q '.[0].state' 2>/dev/null || true)"
+        # Distinguish "no merged PR for this branch" from "gh failed".
+        # Swallowing the latter would make sync silently skip reparenting,
+        # leaving the user thinking the operation succeeded.
+        local state gh_output gh_exit=0
+        gh_output="$(gh pr list --head "$b" --state merged --json number,state -q '.[0].state' 2>&1)" || gh_exit=$?
+        if (( gh_exit != 0 )); then
+            die "gh pr list failed for branch '$b' (exit $gh_exit): $gh_output"
+        fi
+        state="$gh_output"
         if [[ "$state" == "MERGED" ]]; then
             printf '%s\n' "$b"
         fi
