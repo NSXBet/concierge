@@ -177,7 +177,8 @@ Use this path when the user wants a code review on a PR. The review is saved to 
      cd <local-clone-of-the-rig>
      git fetch origin pull/<number>/head:pr-<number>
      git show pr-<number>:<path-to-file> > /tmp/<file>.pr
-     git diff main..pr-<number> -- <path>
+     # Use baseRefName from step 1's `gh pr view --json` output — not a hardcoded "main".
+     git diff <baseRefName>..pr-<number> -- <path>
      ```
    - For large PRs, list files first with `gh pr view <number> --repo <owner/repo> --json files`.
 
