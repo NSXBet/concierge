@@ -117,7 +117,12 @@ cmd_new() {
     local name="" base=""
     while (( $# )); do
         case "$1" in
-            --base) base="${2:-}"; shift 2 ;;
+            --base)
+                [[ $# -ge 2 && -n "${2:-}" && "${2:0:1}" != "-" ]] \
+                    || die "--base requires a value"
+                base="$2"
+                shift 2
+                ;;
             --base=*) base="${1#--base=}"; shift ;;
             -h|--help) usage_new; return 0 ;;
             -*) die "unknown flag for 'new': $1" ;;
@@ -451,9 +456,16 @@ cmd_sync() {
             if [[ "$parent" == "$TRUNK" ]] || \
                { case " ${processed[*]-} " in *" $parent "*) true ;; *) false ;; esac; }; then
                 printf 'gt-stack: rebasing %s onto %s\n' "$b" "$parent"
-                rebase_onto_parent "$b" || warn "rebase of $b failed; resolve conflicts and re-run"
-                processed+=("$b")
-                changed=1
+                # On a failed rebase we stop the sync entirely. The branch is
+                # left mid-rebase for the user to resolve; descendants must
+                # not be processed because their fork point would otherwise
+                # land on top of an unresolved merge state.
+                if rebase_onto_parent "$b"; then
+                    processed+=("$b")
+                    changed=1
+                else
+                    die "rebase of $b failed; resolve conflicts in the worktree and re-run 'gt-stack sync'"
+                fi
             fi
         done
     done

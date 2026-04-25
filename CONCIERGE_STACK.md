@@ -110,7 +110,7 @@ PR's draft state is preserved.
 | `gt-stack children` | Print branches whose parent is the current branch. |
 | `gt-stack restack` | Rebase the current branch + its descendants onto their parents. |
 | `gt-stack push` | Force-with-lease push (safer than `--force`). |
-| `gt-stack submit [--draft]` | Push + open or update the PR with base = recorded parent. |
+| `gt-stack submit [branch] [--draft]` | No arg: push + open/update PRs for the current branch and all descendants (BFS parent-first). With an explicit `branch`: operate on that branch's PR only. Base is set to the recorded parent. |
 | `gt-stack sync [--prune]` | After merges: detect, reparent, cascade-rebase. |
 
 Environment: `GT_STACK_TRUNK` overrides the trunk branch name (default `main`).
@@ -154,9 +154,11 @@ gt-stack submit     # from the bottom branch — pushes current + all descendant
 When it merges:
 
 ```bash
-gt-stack sync           # detects the merge, reparents descendants onto main,
-                        # rebases the stack, leaves descendants ready to submit
-gt-stack submit phase1-dashboards   # retargets PR base to main, pushes
+gt-stack sync                  # detects the merge, reparents descendants onto main,
+                               # rebases the stack, leaves descendants ready to submit
+git checkout phase1-dashboards
+gt-stack submit                # pushes phase1-dashboards + every remaining descendant
+                               # (e.g. phase1-runbook); each PR's base is retargeted
 ```
 
 ## What `gt-stack` deliberately does NOT do
