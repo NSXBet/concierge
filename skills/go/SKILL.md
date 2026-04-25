@@ -173,7 +173,7 @@ Use this path when the user wants a code review on a PR. The review is saved to 
 2. Fetch the diff (with a fallback for truncated output).
    - Try `gh pr diff <number> --repo <owner/repo>` first.
    - If output is truncated (RTK or terminal limits) or you need to grep around context the diff strips, fall back to fetching the PR ref into a local clone and reading the file at HEAD:
-     ```
+     ```bash
      cd <local-clone-of-the-rig>
      git fetch origin pull/<number>/head:pr-<number>
      git show pr-<number>:<path-to-file> > /tmp/<file>.pr
@@ -262,13 +262,13 @@ Use this path when the user wants a code review on a PR. The review is saved to 
      }
      ```
    - Post:
-     ```
+     ```bash
      gh api repos/<owner>/<repo>/pulls/<number>/reviews \
        --method POST \
        --input <payload.json>
      ```
    - Verify the inline comments were anchored correctly:
-     ```
+     ```bash
      gh api "repos/<owner>/<repo>/pulls/<number>/comments" \
        --jq '.[] | select(.pull_request_review_id == <review-id>) | {path, line, body: .body[0:80]}'
      ```
