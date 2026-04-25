@@ -118,9 +118,16 @@ Audits and fixes your local foundation so `/concierge:go` can operate smoothly.
 What it checks and repairs:
 
 - **Gastown** -- initializes the GT root if missing, adds rigs from repo URLs
+- **`gt-stack` helper** -- symlinks the bundled stacked-PR helper into `~/.local/bin` (see [Stacked PRs](#stacked-prs))
 - **Obsidian vault** -- creates the folder structure (`Projects/`, `Plans/`, `Shared/`, `PR-Reviews/`, `Analysis/`)
 - **RTK** -- installs via Homebrew or the official installer, runs `rtk init --global`
 - **Graphify** -- installs the package, runs `graphify install`, builds or refreshes graphs on each rig
+
+### Stacked PRs
+
+Concierge ships `gt-stack`, a thin helper for stacked pull requests on GitHub. When a plan marks a phase as stacked (via `/concierge:plan`), `/concierge:go` dispatches work so each milestone lands as its own PR in a dependency chain, reviewed independently and merged bottom-up.
+
+The helper follows three rules: one commit per branch (iterate with `git commit --amend` + `gt-stack submit`), merge bottom-up, and restack after every amend or merge. The full convention, command reference, and typical flow are in [CONCIERGE_STACK.md](./CONCIERGE_STACK.md).
 
 ## Configuration
 

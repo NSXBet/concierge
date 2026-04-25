@@ -3,6 +3,7 @@ name: plan
 description: interactive planning skill that interviews the user about a feature, change, or improvement, records decisions, explores the codebase via graphify, and produces a structured plan in obsidian with phases, milestones, dependencies, and technology decisions. use when the user wants to plan work before starting it.
 allowed-tools:
   - Bash(gt *)
+  - Bash(gt-stack *)
   - Bash(bd *)
   - Bash(graphify *)
   - Bash(rtk *)
@@ -109,6 +110,30 @@ Pick 1-3 or type your own approach.
 - For architectural forks that depend on codebase state, run a targeted Graphify query before presenting options. Say "Let me check the codebase" briefly.
 - For major architectural decisions (language, service boundaries, database, primary patterns), ask these early -- they shape phases.
 - For tooling and library decisions, ask when they come up naturally or capture them in Technology Decisions at the end.
+
+**Stacked-PR discovery:**
+
+For any plan with more than one milestone per phase, or more than one phase that touches the same rig, ask whether the PRs will ship as a stack. Use the structured question format:
+
+```
+**PR shipping strategy for this phase**
+
+1. **Independent PRs** -- each milestone lands as its own PR against main; no ordering required between PRs
+2. **Stacked PRs** -- milestones land as a dependency chain (PR B is based on PR A, etc.); lands bottom-up after each merge
+3. **One big PR for the whole phase** -- single reviewable unit; only viable for small phases
+
+Recommendation: **{depends on phase size and rig count}**. For multi-step phases that read cleanly as a dependency chain, Option 2 keeps each PR small and reviewable while preserving reviewer flow.
+
+Pick 1-3 or type your own approach.
+```
+
+If the answer is **Stacked PRs**:
+- Record it in the plan's Technology Decisions (`Stacking = gt-stack`) and in the per-phase notes.
+- The plan's phase description should include a short "Stack order" section listing the milestone order (which maps to bottom-to-top in the stack).
+- `/concierge:go` will read this and dispatch milestones using `gt-stack new` for each branch.
+- See `CONCIERGE_STACK.md` at the plugin root for the single-commit-per-branch convention and the three rules.
+
+If the answer is **Independent PRs** or **One big PR**, skip the stack-specific output and proceed normally.
 
 **Lint/format discovery:**
 
@@ -232,6 +257,7 @@ Path: `User/Plans/{project}/{yyyy-mm-dd}-{slug}.md`
 | Testing | {e.g. pytest + factory_boy} | {why} |
 | Linting ({rig}) | {command} | {tool and config} |
 | Formatting ({rig}) | {command} | {tool and config} |
+| Stacking | {none / gt-stack} | {why stacking or not; if stacked, list the stack order} |
 | {other category} | {decision} | {rationale} |
 ```
 

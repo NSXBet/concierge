@@ -157,6 +157,29 @@ def check_git() -> ToolResult:
     return result
 
 
+def check_gt_stack() -> ToolResult:
+    result = ToolResult(name="gt-stack", present=shutil.which("gt-stack") is not None)
+    if not result.present:
+        result.status = "missing"
+        result.note = "install with: python3 skills/setup/scripts/ensure_gt_stack.py --apply"
+        return result
+    # Shipped as a Bash script inside this plugin; no upstream release to compare.
+    # Probe the binary instead — a broken symlink or missing-execute-bit install
+    # would otherwise be reported as healthy by a presence-only check.
+    rc, _ = run(["gt-stack", "help"])
+    if rc != 0:
+        result.status = "missing"
+        result.note = (
+            "found on PATH but failed to execute; reinstall with: "
+            "python3 skills/setup/scripts/ensure_gt_stack.py --apply"
+        )
+        return result
+    result.installed_version = "plugin-local"
+    result.status = "ok"
+    result.note = "shipped by concierge; symlinked into $PATH"
+    return result
+
+
 def check_python() -> ToolResult:
     result = ToolResult(name="python3", present=shutil.which("python3") is not None)
     if not result.present:
@@ -277,6 +300,7 @@ def main() -> int:
 
     tools = [
         check_gt(),
+        check_gt_stack(),
         check_graphify(),
         check_rtk(),
         check_gh(),
