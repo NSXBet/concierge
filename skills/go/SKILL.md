@@ -262,18 +262,20 @@ Use this path when the user wants a code review on a PR. The review is saved to 
        ]
      }
      ```
-   - Post:
+   - Post and capture the response — you will need `id` and `html_url` for the verification step and the Obsidian note frontmatter, so don't discard stdout:
      ```bash
-     gh api repos/<owner>/<repo>/pulls/<number>/reviews \
+     response=$(gh api repos/<owner>/<repo>/pulls/<number>/reviews \
        --method POST \
-       --input <payload.json>
+       --input <payload.json>)
+     review_id=$(echo "$response" | jq -r '.id')
+     review_url=$(echo "$response" | jq -r '.html_url')
      ```
-   - Verify the inline comments were anchored correctly:
+   - Verify the inline comments were anchored correctly using the captured `$review_id` (note: filter expression is double-quoted so the shell interpolates the variable into jq's filter):
      ```bash
      gh api "repos/<owner>/<repo>/pulls/<number>/comments" \
-       --jq '.[] | select(.pull_request_review_id == <review-id>) | {path, line, body: .body[0:80]}'
+       --jq ".[] | select(.pull_request_review_id == $review_id) | {path, line, body: .body[0:80]}"
      ```
-   - Update the Obsidian review note's frontmatter with `review_id` and `review_url`.
+   - Update the Obsidian review note's frontmatter `review_id:` and `review_url:` fields with the captured `$review_id` and `$review_url` values.
 
 10. Reply format.
     - Show grade, finding counts by severity, and verdict.
