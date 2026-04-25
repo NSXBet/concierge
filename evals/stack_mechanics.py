@@ -340,9 +340,12 @@ def test_new_rejects_existing_branch():
 def test_list_shows_chain():
     repo = TestRepo()
     try:
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
-        repo.gt_stack("new", "c"); repo.commit("C")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
+        repo.gt_stack("new", "c")
+        repo.commit("C")
         out = repo.gt_stack("list").stdout
         for name in ["main", "a", "b", "c"]:
             assert_contains(out, name, f"list output contains {name}")
@@ -353,8 +356,10 @@ def test_list_shows_chain():
 def test_parent_and_children():
     repo = TestRepo()
     try:
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
         assert_eq(repo.gt_stack("parent", "b").stdout.strip(), "a", "parent of b")
         assert_eq(repo.gt_stack("children", "a").stdout.strip(), "b", "children of a")
         assert_eq(repo.gt_stack("parent", "a").stdout.strip(), "main", "parent of a")
@@ -365,9 +370,12 @@ def test_parent_and_children():
 def test_restack_cascades_after_amend():
     repo = TestRepo()
     try:
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
-        repo.gt_stack("new", "c"); repo.commit("C")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
+        repo.gt_stack("new", "c")
+        repo.commit("C")
 
         repo.checkout("b")
         repo.amend("B-amended")
@@ -391,9 +399,12 @@ def test_restack_cascades_after_amend():
 def test_restack_cascades_after_trunk_advance():
     repo = TestRepo()
     try:
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
-        repo.gt_stack("new", "c"); repo.commit("C")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
+        repo.gt_stack("new", "c")
+        repo.commit("C")
 
         repo.checkout("main")
         repo.commit("trunk-advance")
@@ -416,9 +427,12 @@ def test_restack_cascades_after_trunk_advance():
 def test_restack_idempotent():
     repo = TestRepo()
     try:
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
-        repo.gt_stack("new", "c"); repo.commit("C")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
+        repo.gt_stack("new", "c")
+        repo.commit("C")
 
         before = {b: repo.rev(b) for b in ["a", "b", "c"]}
         # First restack of an already-consistent stack should be a no-op.
@@ -438,8 +452,10 @@ def test_submit_creates_pr_with_parent_as_base():
         subprocess.run(["git", "init", "--bare", "-q", str(bare)], env=repo.env, check=True)
         repo._git("remote", "add", "origin", str(bare))
 
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
         repo.gt_stack("submit")
         prs = repo.pr_ledger()
         b_prs = [p for p in prs if p["head"] == "b"]
@@ -458,8 +474,10 @@ def test_submit_updates_existing_pr_base():
         subprocess.run(["git", "init", "--bare", "-q", str(bare)], env=repo.env, check=True)
         repo._git("remote", "add", "origin", str(bare))
 
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
         repo.gt_stack("submit")  # creates PR for b with base=a
 
         # Pretend the user (or sync) changed b's parent to main.
@@ -482,9 +500,12 @@ def test_sync_reparents_descendants():
         subprocess.run(["git", "init", "--bare", "-q", str(bare)], env=repo.env, check=True)
         repo._git("remote", "add", "origin", str(bare))
 
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
-        repo.gt_stack("new", "c"); repo.commit("C")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
+        repo.gt_stack("new", "c")
+        repo.commit("C")
         repo._git("push", "-q", "origin", "a", "b", "c", "main")
 
         # Record PRs in the ledger — a is merged, b and c are open.
@@ -514,8 +535,10 @@ def test_sync_prune_deletes_merged_local_branches():
         subprocess.run(["git", "init", "--bare", "-q", str(bare)], env=repo.env, check=True)
         repo._git("remote", "add", "origin", str(bare))
 
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
         repo._git("push", "-q", "origin", "a", "b", "main")
 
         repo.add_pr(number=1, head="a", base="main", state="MERGED")
@@ -544,8 +567,10 @@ def test_sync_without_merges_is_noop():
         subprocess.run(["git", "init", "--bare", "-q", str(bare)], env=repo.env, check=True)
         repo._git("remote", "add", "origin", str(bare))
 
-        repo.gt_stack("new", "a"); repo.commit("A")
-        repo.gt_stack("new", "b"); repo.commit("B")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
+        repo.gt_stack("new", "b")
+        repo.commit("B")
         repo._git("push", "-q", "origin", "a", "b", "main")
 
         repo.add_pr(number=1, head="a", base="main", state="OPEN", draft=False)
@@ -573,7 +598,8 @@ def test_submit_draft_vs_ready():
         subprocess.run(["git", "init", "--bare", "-q", str(bare)], env=repo.env, check=True)
         repo._git("remote", "add", "origin", str(bare))
 
-        repo.gt_stack("new", "a"); repo.commit("A")
+        repo.gt_stack("new", "a")
+        repo.commit("A")
         repo.gt_stack("submit", "--draft")
         prs = [p for p in repo.pr_ledger() if p["head"] == "a"]
         if not prs or not prs[0]["draft"]:

@@ -177,10 +177,9 @@ cmd_children() {
 # because <branch> has not been rewritten yet so <branch>^ still points at
 # the parent's old tip — which is exactly what `git rebase --onto` needs.
 #
-# Violating the one-commit rule (multiple commits on a stacked branch) will
-# silently drop the earlier commits during restack. gt-stack does not guard
-# against this; the convention is enforced by discipline (amend + force-push)
-# and documented in CONCIERGE_STACK.md.
+# Violating the one-commit rule (multiple commits on a stacked branch) would
+# silently drop the earlier commits during restack — `<branch>^` only walks
+# back one parent. We enforce the rule with a hard guard before any rebase.
 rebase_onto_parent() {
     local branch="$1"
     local parent
@@ -195,6 +194,17 @@ rebase_onto_parent() {
     parent_tip="$(git rev-parse "$parent")"
     if [[ "$branch_tip" == "$parent_tip" ]]; then
         return 0
+    fi
+
+    # Enforce the one-commit invariant. The merge-base-anchored count
+    # `parent..branch` stays correct even after the parent has advanced, as
+    # long as `branch` has not yet been rebased — anything other than 1 is
+    # a convention violation that would silently drop earlier commits if we
+    # proceeded with a `<branch>^` fork point.
+    local own_commits
+    own_commits="$(git rev-list --count "$parent..$branch")"
+    if (( own_commits != 1 )); then
+        die "branch '$branch' has $own_commits commits ahead of '$parent' (expected exactly 1). Squash with 'git rebase -i $parent' or 'git commit --amend' before restacking. See CONCIERGE_STACK.md Rule 1."
     fi
 
     local fork
@@ -318,11 +328,17 @@ cmd_sync() {
 
     git fetch origin --prune
     git checkout "$TRUNK"
-    # Update local trunk to match origin via rebase — never merge commits.
-    # If there are no divergent commits this is a fast-forward; if there
-    # are local-only commits on trunk they replay on top of origin.
+    # Update local trunk to match origin. We refuse to proceed if the user has
+    # local-only commits on trunk — sync's downstream rebase loop would replay
+    # those commits into every restacked descendant, leaking them into every
+    # PR in the stack.
     if git show-ref --verify --quiet "refs/remotes/origin/$TRUNK"; then
-        git rebase "refs/remotes/origin/$TRUNK"
+        local ahead
+        ahead="$(git rev-list --count "refs/remotes/origin/$TRUNK..$TRUNK")"
+        if (( ahead != 0 )); then
+            die "$TRUNK has $ahead local commits not on origin/$TRUNK; push or drop them before 'gt-stack sync' (sync would otherwise replay them into every restacked branch)"
+        fi
+        git reset --hard "refs/remotes/origin/$TRUNK"
     fi
 
     local -a merged=()

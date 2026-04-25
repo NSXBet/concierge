@@ -142,7 +142,7 @@ Use this path when the user wants to resume something already in flight.
 2. If there is a single strong candidate, summarize it and continue.
 3. If there are multiple plausible candidates, show up to three choices in plain language and ask the user to pick one.
 4. Refresh Graphify for the active repo if it exists and looks stale.
-5. If the work is part of a stack (parent file `.git/gt-stack/parents` has entries, or the plan declares stacking), check stack state: run `gt-stack list` from the working repo, report which PRs are ready vs. draft, and call out any that need a `gt-stack sync` (e.g. the bottom PR has merged since the last session).
+5. If the work is part of a stack (parent file `.git/gt-stack/parents` has entries, or the plan declares stacking), check stack state: run `gt-stack list` from the working repo to recover branch order, then use `gh pr list --json number,headRefName,isDraft,state` (or `gh pr view <branch> --json isDraft,state` per branch) to report which PRs are ready vs. draft, and call out any that need a `gt-stack sync` (e.g. the bottom PR has merged since the last session).
 6. Update the feature note with current status and next steps.
 7. Dispatch follow-on work or nudge the right agent.
 

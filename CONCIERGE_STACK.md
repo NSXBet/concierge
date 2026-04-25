@@ -119,7 +119,7 @@ git checkout main && git pull --ff-only
 gt-stack new phase1-observability
 # ... edit, test ...
 git add -A && git commit -m "phase 1: OTel baseline"
-gt-stack submit --draft
+gt-stack submit              # bottom of the stack — opens ready for review
 
 # Second PR, draft because phase 1 isn't approved yet
 gt-stack new phase1-dashboards
@@ -133,14 +133,7 @@ git add -A && git commit -m "phase 1: runbook"
 gt-stack submit --draft
 ```
 
-When Phase 1's bottom PR is ready for review:
-
-```bash
-git checkout phase1-observability
-gt-stack submit   # flips the PR from draft to ready
-```
-
-When it receives review feedback:
+When the bottom PR receives review feedback:
 
 ```bash
 # Fix the code, then amend + restack

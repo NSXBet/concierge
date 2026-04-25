@@ -73,19 +73,27 @@ def run() -> int:
     if not ran_audit:
         failures.append("no audit signals seen")
 
-    # Primary assertion: agent invoked ensure_gt_stack.py.
-    ensure_calls = [c for c in commands if "ensure_gt_stack.py" in c]
+    # Primary assertion: agent invoked ensure_gt_stack.py with --apply. A
+    # dry-run (no --apply) prints PLAN and never installs, so the install
+    # scenario must require --apply to flip the assertion green.
+    ensure_calls = [
+        c for c in commands
+        if "ensure_gt_stack.py" in c and "--apply" in c
+    ]
     if not ensure_calls:
         failures.append(
-            "agent did not invoke ensure_gt_stack.py. Commands run:\n  "
+            "agent did not invoke ensure_gt_stack.py --apply. Commands run:\n  "
             + "\n  ".join(commands)
         )
 
-    # Secondary signal: the final text should mention the helper being
-    # installed or available.
+    # Soft signal: the final text mentions the helper being installed or
+    # available. Mirror the soft-note pattern in stack_dispatch.py — the
+    # behavioral guarantee comes from `ran_audit` and `ensure_calls` above,
+    # so a correct install run shouldn't flip red purely on narration text.
     if "gt-stack" not in text and "gt_stack" not in text:
-        failures.append(
-            f"final response does not mention gt-stack. Full text:\n{final_text(messages)}"
+        print(
+            f"NOTE {NAME}: final response does not mention gt-stack. "
+            f"Full text:\n{final_text(messages)}"
         )
 
     exit_code = report(NAME, failures)

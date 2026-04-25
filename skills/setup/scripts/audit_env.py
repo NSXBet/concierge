@@ -164,9 +164,16 @@ def check_gt_stack() -> ToolResult:
         result.note = "install with: python3 skills/setup/scripts/ensure_gt_stack.py --apply"
         return result
     # Shipped as a Bash script inside this plugin; no upstream release to compare.
-    # Report the concierge plugin version so a `gt-stack older than this concierge`
-    # mismatch surfaces clearly.
-    _, out = run(["gt-stack", "help"])
+    # Probe the binary instead — a broken symlink or missing-execute-bit install
+    # would otherwise be reported as healthy by a presence-only check.
+    rc, _ = run(["gt-stack", "help"])
+    if rc != 0:
+        result.status = "missing"
+        result.note = (
+            "found on PATH but failed to execute; reinstall with: "
+            "python3 skills/setup/scripts/ensure_gt_stack.py --apply"
+        )
+        return result
     result.installed_version = "plugin-local"
     result.status = "ok"
     result.note = "shipped by concierge; symlinked into $PATH"

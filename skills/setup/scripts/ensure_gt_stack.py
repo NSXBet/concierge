@@ -51,6 +51,14 @@ def main() -> int:
         print(f"ERROR source {source} not found; the concierge plugin checkout is incomplete")
         return 1
 
+    # Repair the source's executable bit on every path, including the
+    # already-linked no-op return below. A fresh clone may ship without
+    # the execute bit and audit_env.py would otherwise see the symlink as
+    # present but `gt-stack help` would fail.
+    mode = source.stat().st_mode
+    if mode & 0o111 != 0o111:
+        source.chmod(mode | 0o111)
+
     already_linked = target.is_symlink() and target.resolve() == source
     already_file = target.exists() and not target.is_symlink()
     print(f"INSTALL_DIR_ON_PATH {str(on_path(target_dir)).lower()}")
@@ -73,9 +81,6 @@ def main() -> int:
     if target.is_symlink():
         target.unlink()
     os.symlink(source, target)
-    # Ensure the source is executable (in case a fresh clone has wrong bits)
-    mode = source.stat().st_mode
-    source.chmod(mode | 0o111)
 
     print(f"CMD ln -s {source} {target}")
     print("STATUS installed")

@@ -53,12 +53,27 @@ def run() -> int:
     shop_repo = sandbox.gt_root / "shop" / "mayor" / "rig"
     seed_git_repo(shop_repo, "git@github.com:acme/shop.git")
 
+    # Seed a real plan note so the skill's stack-aware path can trigger from
+    # the documented gating predicate (plan note carries `Stacking = gt-stack`)
+    # rather than from prompt-only inference.
+    plan_dir = sandbox.vault_root / "User" / "Projects" / "shop" / "Convoys"
+    plan_dir.mkdir(parents=True, exist_ok=True)
+    (plan_dir / "stacked-shop-feature.md").write_text(
+        "# Stacked shop feature\n\n"
+        "## Technology Decisions\n\n"
+        "| Decision | Value |\n"
+        "|:--|:--|\n"
+        "| Stacking | gt-stack |\n\n"
+        "## Stack order\n\n"
+        "1. shop-api (bottom, base = main)\n"
+        "2. shop-ui (on top of shop-api)\n"
+        "3. shop-docs (on top of shop-ui)\n"
+    )
+
     prompt = (
-        "/concierge:go I want to ship three stacked PRs for the shop rig: "
-        "one for the api changes (base of the stack), one for the ui on top, "
-        "and one for the docs on top of the ui. The plan declares "
-        "Stacking = gt-stack. Use the gt-stack helper for dispatch — start "
-        "with the bottom branch."
+        "/concierge:go Use the plan note at "
+        "User/Projects/shop/Convoys/stacked-shop-feature.md "
+        "and start with the bottom branch."
     )
 
     try:
