@@ -100,6 +100,40 @@ bottom should be ready and descendants stay draft (the bottom-up merge
 convention), use single-branch `gt-stack submit <branch>` calls so each
 PR's draft state is preserved.
 
+#### Rule 3a — The new bottom of the stack is the only PR ready for review
+
+A direct consequence of Rule 2 (merge bottom-up) and the convention that
+descendants stay draft: at any moment, **exactly one PR in the stack is
+ready for review** — the one whose base is `main`. Every PR above it
+stays in draft until the one below it merges.
+
+When `gt-stack sync` reparents a previously-draft PR onto `main` (because
+its parent merged), that PR has just become the new bottom and must be
+promoted from draft to ready-for-review. **`gt-stack submit` does not
+flip the draft flag on its own** — its `--draft`/no-`--draft` semantics
+apply only when explicitly passed, and a no-arg cascade preserves the
+existing per-PR draft state.
+
+The promotion step:
+
+```bash
+gh pr ready <pr-number>
+```
+
+After every `gt-stack sync`, audit the result:
+
+```bash
+# Should print exactly one line, with isDraft=false and base=main:
+for n in <pr-numbers-in-stack>; do
+  gh pr view "$n" --json number,baseRefName,isDraft \
+    --jq 'select(.baseRefName=="main") | "\(.number) base=main draft=\(.isDraft)"'
+done
+```
+
+If the line shows `draft=true`, run `gh pr ready <n>`. Symmetric audit:
+no PR above the new bottom should be ready — if one is, run
+`gh pr ready <n> --undo` to put it back into draft until its turn comes.
+
 ## Commands
 
 | Command | What it does |
@@ -159,6 +193,10 @@ gt-stack sync                  # detects the merge, reparents descendants onto m
 git checkout phase1-dashboards
 gt-stack submit                # pushes phase1-dashboards + every remaining descendant
                                # (e.g. phase1-runbook); each PR's base is retargeted
+
+# phase1-dashboards is now the new bottom of the stack — promote its PR
+# (gt-stack submit does NOT flip the draft flag; see Rule 3a):
+gh pr ready <phase1-dashboards-pr-number>
 ```
 
 ## What `gt-stack` deliberately does NOT do
