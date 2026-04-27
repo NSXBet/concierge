@@ -163,24 +163,32 @@ Use this path when the user wants to start a brand new project or add a repo to 
 
 ### E. Review a pull request
 
-Use this path when the user wants a code review on a PR. The review is saved to Obsidian and optionally posted to GitHub.
+Use this path when the user wants a code review on a PR. The review is saved to Obsidian and optionally posted to GitHub. Posting a review is a visible, multi-author-affecting action — confirm intent before publishing if the user wasn't explicit.
 
 1. Identify the PR.
    - The user may give a PR number, URL, or repo name.
    - If only a number is given, infer the repo from the current rig or ask.
-   - Use `gh pr view <number> --repo <owner/repo> --json title,author,baseRefName,headRefName,number,body,files` to get PR metadata.
+   - Fetch metadata: `gh pr view <number> --repo <owner/repo> --json title,author,baseRefName,headRefName,number,body,files,state,additions,deletions`.
 
-2. Fetch the diff.
-   - Use `gh pr diff <number> --repo <owner/repo>` to get the full diff.
-   - For large PRs, also fetch the file list with `gh pr view <number> --repo <owner/repo> --json files`.
+2. Fetch the diff (with a fallback for truncated output).
+   - Try `gh pr diff <number> --repo <owner/repo>` first.
+   - If output is truncated (RTK or terminal limits) or you need to grep around context the diff strips, fall back to fetching the PR ref into a local clone and reading the file at HEAD:
+     ```bash
+     cd <local-clone-of-the-rig>
+     git fetch origin pull/<number>/head:pr-<number>
+     git show pr-<number>:<path-to-file> > /tmp/<file>.pr
+     # Use baseRefName from step 1's `gh pr view --json` output — not a hardcoded "main".
+     git diff <baseRefName>..pr-<number> -- <path>
+     ```
+   - For large PRs, list files first with `gh pr view <number> --repo <owner/repo> --json files`.
 
 3. Determine the review number.
-   - Check if `User/PR-Reviews/<project>/<PR-number>/` exists in the Obsidian vault.
-   - Count existing review files. The next number is `max + 1`. First review is `1`.
+   - Check `User/PR-Reviews/<project>/<PR-number>/` in the Obsidian vault.
+   - Next number is `max(existing) + 1`. First review is `1`.
 
 4. Read relevant project context.
-   - Check the Obsidian `User/Projects/<project>/` notes for architecture context.
-   - If Graphify exists on the rig, use `graphify query` to understand affected code paths.
+   - Skim `User/Projects/<project>/` notes for architecture context.
+   - If Graphify is built on the rig, use `graphify query` to understand affected code paths.
 
 5. Perform the review.
    - Read the diff thoroughly. For each file, understand what changed and why.
@@ -196,29 +204,83 @@ Use this path when the user wants a code review on a PR. The review is saved to 
      - **MEDIUM** — code quality, naming, missing tests. Worth fixing.
      - **LOW** — style, minor improvements. Optional.
      - **NIT** — preferences, formatting. Take it or leave it.
-   - For each finding, record: severity, file path, line range, description, and suggested fix.
+   - For each finding record: severity, file path, line range, description, and suggested fix.
 
 6. Write the Obsidian review note.
-   - Path: `User/PR-Reviews/<project>/<PR-number>/<review-number>.md`
-   - Use the review note template from `references/note-templates.md`.
+   - Path: `User/PR-Reviews/<project>/<PR-number>/<review-number>.md`.
+   - Use the review note template from `references/note-templates.md` (frontmatter + findings table + "what this PR does well" section).
 
-7. Post to GitHub (only if the user asks, or confirm before posting).
-   - Determine the verdict: APPROVE, REQUEST_CHANGES, or COMMENT.
-   - Build the review body with summary, grade, and top-level findings.
-   - Post file-level comments using the GitHub API:
+7. Inline comment shape (binding when posting).
+   Each inline comment must follow this structure so reviewers and authors can scan reviews consistently and humans can hand-off fixes to other AI assistants without re-explaining:
+
+   ```md
+   **[SEVERITY] — Short title**
+
+   <One paragraph: why this is a problem, with file/line anchors and any
+    relevant code references. Keep it concrete and specific.>
+
+   **Suggestion:** <one paragraph or short bullet list of fix options.>
+
+   <details>
+   <summary>🤖 Prompt to AI</summary>
+
+   Before fixing this, please validate it is actually a problem.
+
+   <Self-contained prompt: file paths, symbol names, what to grep for,
+    what to verify, and the concrete change to propose. Written so the
+    user can paste it into any AI assistant cold.>
+
+   </details>
+
+   <sub>_— I'm Claude Code, posting this comment on behalf of @<user>._</sub>
+   ```
+
+   Conventions:
+   - The "Prompt to AI" body **must** start with the literal sentence `Before fixing this, please validate it is actually a problem.` — this protects the author from cargo-culted "fixes" to non-issues.
+   - The disclosure footer is **mandatory** on every comment and on the top-level review summary. Never post under a human's account without it.
+   - Resolve the human's GitHub handle from `gh auth status` before composing the footer; do not guess.
+
+8. Pre-flight before posting.
+   - **Account check.** Run `gh auth status` and confirm which account will publish the review. Surface the login to the user if it isn't obvious from context.
+   - **Line-numbers-in-hunks check.** Inline comments must target a line that falls inside one of the PR's diff hunks (a changed line or the surrounding context). Lines outside any hunk will silently fail or land on the wrong place. Read the `@@ ... @@` headers and confirm each comment's `line` is in range.
+   - **JSON validation.** Validate the review payload before sending: `python3 -c "import json; json.load(open('<file>'))"`. Heredoc / shell quoting bugs are the #1 reason a review submit returns garbage.
+
+9. Post to GitHub (only if the user asks, or confirm before posting).
+   - Determine the verdict: `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`.
+   - Build a single JSON file with the full review payload — do not mix `-f` flags with `--input`:
+     ```json
+     {
+       "event": "COMMENT",
+       "body": "<top-level review summary, including findings table and disclosure footer>",
+       "comments": [
+         {
+           "path": "<file>",
+           "line": <line-in-new-file>,
+           "side": "RIGHT",
+           "body": "<inline comment per the shape in step 7>"
+         }
+       ]
+     }
      ```
-     gh api repos/{owner}/{repo}/pulls/{number}/reviews \
+   - Post and capture the response — you will need `id` and `html_url` for the verification step and the Obsidian note frontmatter, so don't discard stdout:
+     ```bash
+     response=$(gh api repos/<owner>/<repo>/pulls/<number>/reviews \
        --method POST \
-       -f event=<APPROVE|REQUEST_CHANGES|COMMENT> \
-       -f body="<review summary>" \
-       --input <comments-json>
+       --input <payload.json>)
+     review_id=$(echo "$response" | jq -r '.id')
+     review_url=$(echo "$response" | jq -r '.html_url')
      ```
-   - For inline comments, use the `comments` array in the review payload with `path`, `line`, and `body` fields.
-   - Tell the user the review was posted and link to it.
+   - Verify the inline comments were anchored correctly using the captured `$review_id` (note: filter expression is double-quoted so the shell interpolates the variable into jq's filter):
+     ```bash
+     gh api "repos/<owner>/<repo>/pulls/<number>/comments" \
+       --jq ".[] | select(.pull_request_review_id == $review_id) | {path, line, body: .body[0:80]}"
+     ```
+   - Update the Obsidian review note's frontmatter `review_id:` and `review_url:` fields with the captured `$review_id` and `$review_url` values.
 
-8. Reply format.
-   - Show the grade, finding counts by severity, and verdict.
-   - If not posting to GitHub, ask: "Want me to post this as a review on the PR?"
+10. Reply format.
+    - Show grade, finding counts by severity, and verdict.
+    - Link the review URL.
+    - If not posting to GitHub, ask: "Want me to post this as a review on the PR?"
 
 ### D. Status, blockers, and routing
 

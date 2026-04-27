@@ -87,40 +87,64 @@ Path:
 Suggested content:
 
 ```md
-# PR #<number>: <title>
+---
+pr: <number>
+repo: <owner>/<repo>
+title: "<PR title>"
+author: <github-handle>
+reviewer: <your-github-handle> (via Claude Code)
+date: <YYYY-MM-DD>
+verdict: <APPROVE | REQUEST_CHANGES | COMMENT>
+grade: <A-F>
+review_id: <github-review-id, filled after posting>
+review_url: <https://github.com/...#pullrequestreview-...>
+---
 
-**Author:** <author>
-**Branch:** <head> → <base>
-**Date:** <YYYY-MM-DD>
-**Review:** #<review-number>
+# Review #<review-number> — <owner>/<repo> PR <number>
 
-## Summary
-[2-3 sentences on what this PR does]
+## PR
 
-## Grade: <A-F>
-[One sentence justification]
+- **Title:** <PR title>
+- **Branch:** `<head>` → `<base>`
+- **Author:** @<author>
+- **Stats:** +<adds> / -<dels> across <n> files
+
+### What it changes
+<2-3 sentences on what this PR does, including any motivating bug or feature.>
+
+## Verdict
+
+**<APPROVE | REQUEST_CHANGES | COMMENT>** — <one sentence justifying the verdict and grade>.
+
+**Grade: <A-F>**
+
+## What this PR does well
+- <thing-1>
+- <thing-2>
 
 ## Findings
 
-### CRITICAL
-- **<file>:<lines>** — <description>
-  > <suggested fix or explanation>
+| # | Severity | File                  | Line | Title                                |
+|---|----------|-----------------------|------|--------------------------------------|
+| 1 | CRITICAL | `<path>`              | <n>  | <short title>                        |
+| 2 | HIGH     | `<path>`              | <n>  | <short title>                        |
+| 3 | MEDIUM   | `<path>`              | <n>  | <short title>                        |
+| 4 | LOW      | `<path>`              | <n>  | <short title>                        |
 
-### HIGH
-- **<file>:<lines>** — <description>
+### Finding 1 (<SEVERITY>) — <title>
+<Problem explanation. Suggested fix.>
 
-### MEDIUM
-- **<file>:<lines>** — <description>
+### Finding 2 (<SEVERITY>) — <title>
+<…>
 
-### LOW
-- **<file>:<lines>** — <description>
+## Posted
 
-### NIT
-- **<file>:<lines>** — <description>
-
-## Verdict: <APPROVE | REQUEST_CHANGES | COMMENT>
-[One sentence on what needs to happen next]
+- Review URL: <fill after posting>
+- Inline comments: <count> (resolved against commit `<sha>`)
+- Disclosure footer added to each comment + summary noting Claude Code posted on behalf of @<user>.
 ```
+
+The frontmatter is the source of truth for tooling that aggregates reviews; keep it accurate even if the body drifts.
 
 ## Analysis note
 
