@@ -471,6 +471,7 @@ cmd_sync() {
     done
 
     printf 'gt-stack: sync complete. Remember to `gt-stack submit` each remaining branch to retarget its PR base and push the rebased SHA.\n'
+    printf 'gt-stack: the branch now parented on %s is the new bottom of the stack — confirm its PR is ready-for-review (not draft) with `gh pr ready <pr-number>`. Only the bottom PR is ready; descendants stay draft until the one below merges.\n' "$TRUNK"
 }
 
 # --- usage ------------------------------------------------------------------
