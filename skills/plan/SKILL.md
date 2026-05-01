@@ -1,6 +1,6 @@
 ---
 name: plan
-description: interactive planning skill that interviews the user about a feature, change, or improvement, records decisions, explores the codebase via graphify, and produces a structured plan in obsidian with phases, milestones, dependencies, and technology decisions. use when the user wants to plan work before starting it.
+description: interactive planning skill that interviews the user about a feature, change, or improvement, records decisions, explores the codebase via graphify, and produces a structured plan in obsidian with phases, milestones, dependencies, and technology decisions. use when the user wants to plan work before starting it. also supports listing all plans across all rigs to view their completion status.
 allowed-tools:
   - Bash(gt *)
   - Bash(gt-stack *)
@@ -35,12 +35,58 @@ Use this skill when the user wants to plan work before starting it. The skill in
 
 The plan is a snapshot reference document. Gastown is authoritative on execution state. After approval the skill offers to hand off to `/concierge:go` to begin Phase 1.
 
+When invoked as `/concierge:plan list`, the skill lists all plans across all rigs with their completion status (complete/incomplete phases, complete/incomplete milestones, and progress percentage).
+
 ## Path Resolution
 
 Resolve paths in this order:
 
 - GT root: `MAIN_GT_ROOT`, then `GT_TOWN_ROOT`, then `~/gt`
 - Obsidian vault: `MAIN_OBSIDIAN_ROOT`, then `OBSIDIAN_VAULT`, then `~/notes/work`
+
+## List Plans Mode
+
+When the user invokes `/concierge:plan list`, the skill scans all rigs in the GT town for their `Plans/` directories and displays a summary table with:
+
+- Rig name
+- Plan title
+- Status (Draft/Approved)
+- Project name
+- Complete/Total phases
+- Complete/Total milestones
+- Progress percentage
+
+### Implementation Steps:
+
+1. **Discover all rigs**: Use `gt rig list` to get all rig names in the town
+2. **Scan Plans directories**: For each rig, check `$GT_ROOT/$rig/Plans/` and `$GT_ROOT/$rig/.beads/Plans/`
+3. **Parse plan files**: Read each `.md` file in Plans directories
+4. **Extract metadata**: Parse frontmatter and markdown to get:
+   - Plan title (from `# Title`)
+   - Status (from Status field)
+   - Project name (from Project field)
+   - Phases section (count complete/incomplete phases)
+   - Milestones (count complete/incomplete from `- [ ]` vs `- [X]`)
+5. **Display table**: Show all plans in a formatted table
+6. **Offer next steps**: Ask user what they want to do next
+
+### Example Output:
+
+```
+| Rig         | Plan Title                              | Status | Project | Phases       | Milestones         | Progress |
+|-------------|-----------------------------------------|--------|---------|--------------|--------------------|----------|
+| flutter_code| flutter-code Phase 9                    | Draft  | fc      | 8/9 phases   | 42/50 milestones   | 84%      |
+| flags       | Feature flag rollout                    | Draft  | flags   | 0/3 phases   | 0/15 milestones    | 0%       |
+```
+
+### Completeness Tracking:
+
+- **Complete phase**: All milestones are checked (`- [X] `)
+- **Incomplete phase**: At least one milestone is unchecked (`- [ ] `)
+- **Complete milestone**: Line starts with `- [X] `
+- **Incomplete milestone**: Line starts with `- [ ] ` (not in verification section)
+
+After the list, prompt the user: "What would you like to do next: plan new work, review a specific plan, or continue with something else?"
 
 ## Work Types
 
@@ -341,6 +387,7 @@ When handing off to `/concierge:go`:
 ## Examples
 
 - `/concierge:plan`
+- `/concierge:plan list` - list all plans across all rigs
 - `/concierge:plan new feature for the shop checkout flow`
 - `/concierge:plan refactor the authentication middleware in api`
 - `/concierge:plan improve test coverage for the payments module`
