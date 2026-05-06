@@ -92,13 +92,19 @@ def apply(plans: list[RepoPlan]) -> int:
             if rc != 0:
                 print(f"ERROR command failed for {plan.rig}")
                 return rc
-        build_cmd = ["graphify", ".", "--update"] if plan.mode == "update" else ["graphify", "."]
-        rc, out = run(build_cmd, plan.repo_path)
-        print(f"CMD {' '.join(build_cmd)}")
-        print(out)
-        if rc != 0:
-            print(f"ERROR build failed for {plan.rig}")
-            return rc
+        if plan.mode == "update":
+            build_cmd = ["graphify", "update", "."]
+            rc, out = run(build_cmd, plan.repo_path)
+            print(f"CMD {' '.join(build_cmd)}")
+            print(out)
+            # graphify exits non-zero due to a known _os NameError in the tips check,
+            # but the actual update succeeds — treat as success when output confirms it
+            update_ok = rc == 0 or ("graph.json" in out and "GRAPH_REPORT.md updated" in out)
+            if not update_ok:
+                print(f"ERROR build failed for {plan.rig}")
+                return rc
+        else:
+            print(f"SKIP full build for {plan.rig} — run /graphify in that repo to generate the initial graph")
     return 0
 
 
